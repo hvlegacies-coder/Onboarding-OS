@@ -82,17 +82,22 @@ export default function Login() {
     if (spotRef.current) spotRef.current.style.opacity = '0'
   }
 
-  const enter = (e: React.FormEvent) => {
+  const [busy, setBusy] = useState(false)
+
+  const enter = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (signIn(email, password, role)) {
-      navigate(role === 'owner' ? '/my-office' : '/', { replace: true })
-    } else {
-      setError(
-        role === 'owner'
-          ? 'No office matches that username and password.'
-          : 'That email and password combination is not recognized.',
-      )
-    }
+    if (busy) return
+    setBusy(true)
+    setError('')
+
+    // The role picker is presentational now. Supabase decides what this account
+    // actually is, and lands them on the right page — an owner who picks
+    // "Admin" still ends up in their own office rather than being refused.
+    const res = await signIn(email, password)
+    setBusy(false)
+
+    if (res.ok) navigate('/', { replace: true })
+    else setError(res.error)
   }
 
   return (
@@ -187,14 +192,7 @@ export default function Login() {
             One central account · One standardized form · One link per office
           </div>
 
-          <DemoAccess
-            onUse={(e, p, r) => {
-              setEmail(e)
-              setPassword(p)
-              setRole(r)
-              setError('')
-            }}
-          />
+          
         </div>
 
         {/* ── Right: handset ────────────────────────────────── */}
@@ -306,9 +304,9 @@ export default function Login() {
                     {/* Owners sign in with a username; the platform operator
                         still uses an email address. */}
                     <PhoneField
-                      Icon={role === 'owner' ? UserRound : Mail}
-                      type={role === 'owner' ? 'text' : 'email'}
-                      placeholder={role === 'owner' ? 'Username' : 'Work email'}
+                      Icon={Mail}
+                      type="email"
+                      placeholder="Work email"
                       autoComplete="username"
                       value={email}
                       onChange={setEmail}
@@ -396,60 +394,6 @@ function PhoneField({
   )
 }
 
-/**
- * Prototype convenience: fills the form with a working credential.
- * Delete this block the moment real accounts exist.
- */
-function DemoAccess({ onUse }: { onUse: (email: string, password: string, role: Role) => void }) {
-  const [open, setOpen] = useState(false)
-  const demoOffice = offices.find((o) => o.id === 'king-j')
-
-  const rows: { label: string; email: string; password: string; role: Role }[] = [
-    { label: 'Platform operator', email: 'hvlegacies@gmail.com', password: 'Hello2026!', role: 'admin' },
-    ...(demoOffice
-      ? [{ label: demoOffice.name, email: demoOffice.ownerUsername, password: passwordFor(demoOffice), role: 'owner' as Role }]
-      : []),
-  ]
-
-  return (
-    <div className="mt-6 max-w-[440px]">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted transition-colors hover:text-gold"
-      >
-        <KeyRound size={13} />
-        Demo access
-        <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <div className="mt-3 space-y-2 rounded-[12px] border border-[rgba(212,175,55,.16)] bg-[rgba(255,255,255,.02)] p-3">
-          {rows.map((r) => (
-            <button
-              key={r.email}
-              type="button"
-              onClick={() => onUse(r.email, r.password, r.role)}
-              className="flex w-full items-center gap-3 rounded-[9px] px-2.5 py-2 text-left transition-colors hover:bg-[rgba(212,175,55,.07)]"
-            >
-              <span className="flex-1">
-                <span className="block text-[12px] font-semibold text-ivory">{r.label}</span>
-                <span className="block font-mono text-[10.5px] text-muted">
-                  {r.email} · {r.password}
-                </span>
-              </span>
-              <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-gold">Use</span>
-            </button>
-          ))}
-          <p className="px-2.5 pt-1 text-[10.5px] leading-relaxed text-muted">
-            Prototype credentials only — they live in the browser bundle and must be replaced by
-            server-side accounts before launch.
-          </p>
-        </div>
-      )}
-    </div>
-  )
-}
 
 /** Status-bar clock on Eastern time — the operating timezone. DST-aware. */
 function useEasternClock() {

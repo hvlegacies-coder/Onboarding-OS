@@ -1,31 +1,78 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { CalendarDays, Check, TriangleAlert } from 'lucide-react'
-import { officeBySlug } from '../data/mock'
-import { bookableSessions, useSessions } from '../lib/sessionStore'
-import { registerProspect } from '../lib/prospectStore'
-import { createSendForOffice, signUrl } from '../lib/contractStore'
+import {
+  fetchOfficeBySlug,
+  fetchPublicSessions,
+  formatSessionDate,
+  registerProspect,
+  supabaseReady,
+  type Office,
+  type PublicSession,
+} from '../lib/supabase'
 import { sendRegistration } from '../lib/ghl'
 
 /**
  * The one standardized invitation form (R1) — identical for every office.
- * No logos, no branding, and no office selector: the Office ID is resolved
- * from the link segment alone (R2).
+ * No logos, no branding, and no office selector.
+ *
+ * The office is resolved from the link segment alone (R2), and resolved twice:
+ * here, to decide whether to show a form, and again inside the database when
+ * the booking is written. The second one is what actually binds the prospect to
+ * an office — this one only decides what to render.
  */
 export default function Join() {
   const { officeSlug } = useParams()
-  const office = officeBySlug(officeSlug)
-  // Live catalog: a session added on the Sessions page shows up here at once.
-  useSessions()
-  const discovery = bookableSessions()
 
-  const [session, setSession] = useState(discovery[0]?.id ?? '')
+  const [office, setOffice] = useState<Office | null>(null)
+  const [sessions, setSessions] = useState<PublicSession[]>([])
+  const [loading, setLoading] = useState(true)
+  const [session, setSession] = useState('')
   const [form, setForm] = useState({ name: '', phone: '', email: '' })
   const [done, setDone] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const [o, s] = await Promise.all([fetchOfficeBySlug(officeSlug ?? ''), fetchPublicSessions()])
+      if (cancelled) return
+      setOffice(o)
+      setSessions(s)
+      setSession(s[0]?.id ?? '')
+      setLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [officeSlug])
 
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }))
-  const chosenSession = discovery.find((s) => s.id === session)
+  const chosen = sessions.find((s) => s.id === session)
+  const label = (s: PublicSession) => `${formatSessionDate(s.dateOn)} · ${s.timeLabel}`
+
+  if (loading) {
+    return (
+      <Shell>
+        <div className="bevel p-8 text-center text-[13px] text-muted">Loading…</div>
+      </Shell>
+    )
+  }
+
+  if (!supabaseReady) {
+    return (
+      <Shell>
+        <div className="bevel p-5 text-center sm:p-8">
+          <TriangleAlert className="mx-auto text-warn" size={28} />
+          <h1 className="mt-4 font-cinzel text-[22px] font-semibold text-ivory">Not available</h1>
+          <p className="mx-auto mt-3 max-w-[380px] text-[13.5px] leading-relaxed text-muted">
+            This site isn't connected to its database yet. Please try again shortly.
+          </p>
+        </div>
+      </Shell>
+    )
+  }
 
   // Unknown slug: never guess an office — hold and let an admin sort it out.
   if (!office) {
@@ -33,46 +80,19 @@ export default function Join() {
       <Shell>
         <div className="bevel p-5 text-center sm:p-8">
           <TriangleAlert className="mx-auto text-warn" size={28} />
-          <h1 className="mt-4 font-cinzel text-[22px] font-semibold text-ivory">This invitation link isn't valid</h1>
+          <h1 className="mt-4 font-cinzel text-[22px] font-semibold text-ivory">
+            This invitation link isn't valid
+          </h1>
           <p className="mx-auto mt-3 max-w-[380px] text-[13.5px] leading-relaxed text-muted">
-            We couldn't match this link to an office. Please ask the person who invited you to resend their
-            link — an administrator has been alerted.
+            We couldn't match this link to an office. Please ask the person who invited you to resend
+            their link.
           </p>
         </div>
       </Shell>
     )
   }
 
-  if (done) {
-    const chosen = discovery.find((s) => s.id === session)
-    return (
-      <Shell>
-        <div className="bevel p-5 text-center sm:p-8">
-          <div className="gold-fill mx-auto grid h-14 w-14 place-items-center rounded-full text-[#241a04]">
-            <Check size={26} strokeWidth={2.6} />
-          </div>
-          <h1 className="mt-5 font-cinzel text-[24px] font-semibold text-ivory">You're registered</h1>
-          <p className="mx-auto mt-3 max-w-[400px] text-[13.5px] leading-relaxed text-muted">
-            {form.name.split(' ')[0] || 'You'}, your seat is saved for the Discovery Session on{' '}
-            <span className="text-champagne">{chosen?.date}</span> at{' '}
-            <span className="text-champagne">{chosen?.time}</span>. A confirmation email and text are on the
-            way, with a calendar invite and your meeting link.
-          </p>
-          <p className="mt-6 border-t border-[rgba(212,175,55,.14)] pt-5 text-[12px] text-muted">
-            Reminders will reach you 24 hours, 2 hours, and 30 minutes before the session starts.
-          </p>
-        </div>
-      </Shell>
-    )
-  }
-
-  /*
-   * Nothing on the calendar yet. Showing the form would let someone submit a
-   * booking with no session attached, which is worse than saying so plainly —
-   * an admin publishes a Discovery Session on the Sessions page and this comes
-   * back on its own.
-   */
-  if (discovery.length === 0) {
+  if (sessions.length === 0) {
     return (
       <Shell>
         <div className="bevel p-5 text-center sm:p-8">
@@ -82,7 +102,29 @@ export default function Join() {
           </h1>
           <p className="mx-auto mt-3 max-w-[400px] text-[13.5px] leading-relaxed text-muted">
             There are no Discovery Sessions scheduled yet. Your link is valid — check back shortly, or
-            let {office.owner || office.name} know you're ready to join the next one.
+            let {office.ownerName || 'your contact'} know you're ready to join the next one.
+          </p>
+        </div>
+      </Shell>
+    )
+  }
+
+  if (done) {
+    return (
+      <Shell>
+        <div className="bevel p-5 text-center sm:p-8">
+          <div className="gold-fill mx-auto grid h-14 w-14 place-items-center rounded-full text-[#241a04]">
+            <Check size={26} strokeWidth={2.6} />
+          </div>
+          <h1 className="mt-5 font-cinzel text-[24px] font-semibold text-ivory">You're registered</h1>
+          <p className="mx-auto mt-3 max-w-[400px] text-[13.5px] leading-relaxed text-muted">
+            {form.name.split(' ')[0] || 'You'}, your seat is saved for the Discovery Session on{' '}
+            <span className="text-champagne">{chosen ? formatSessionDate(chosen.dateOn) : ''}</span> at{' '}
+            <span className="text-champagne">{chosen?.timeLabel}</span>. A confirmation email and text
+            are on the way, with a calendar invite and your meeting link.
+          </p>
+          <p className="mt-6 border-t border-[rgba(212,175,55,.14)] pt-5 text-[12px] text-muted">
+            Reminders will reach you 24 hours, 2 hours, and 30 minutes before the session starts.
           </p>
         </div>
       </Shell>
@@ -107,44 +149,40 @@ export default function Join() {
             e.preventDefault()
             if (busy) return
             setBusy(true)
+            setError('')
 
-            // Create the contact in the central account (R3) and book the session.
-            registerProspect({
-              officeId: office.id,
+            const res = await registerProspect({
+              slug: officeSlug ?? '',
               name: form.name.trim(),
               email: form.email.trim(),
               phone: form.phone.trim(),
-              sessionId: session,
+              sessionId: session || null,
             })
 
-            // Their agreement goes out with the booking confirmation, so raise
-            // the document now and hand its link to the workflow. Returns null
-            // if this office hasn't finished its contract setup — the seat is
-            // still reserved either way, and the payload says so with a blank
-            // link rather than a broken one.
-            const contract = createSendForOffice(office.id, {
-              name: form.name.trim(),
-              email: form.email.trim(),
-              phone: form.phone.trim(),
-            })
+            if (!res.ok) {
+              setBusy(false)
+              setError(
+                /unknown invite link/i.test(res.error)
+                  ? "This invitation link isn't valid any more. Please ask for a fresh one."
+                  : `We couldn't save your seat: ${res.error}`,
+              )
+              return
+            }
 
-            // Hand off to GHL for the confirmation email/SMS and owner
-            // notification. Deliberately not awaited: the seat is already
-            // reserved above, so a slow or failing webhook must not hold up
-            // the prospect's confirmation. Failures surface in the console,
-            // where an owner can actually act on them.
+            // Hand off to GoHighLevel for the confirmation. Not awaited: the
+            // seat is already saved, so a slow webhook must not hold up the
+            // prospect's confirmation screen.
             void sendRegistration({
               fullName: form.name.trim(),
               phone: form.phone.trim(),
               email: form.email.trim(),
-              sessionChosen: chosenSession ? `${chosenSession.date} · ${chosenSession.time}` : '',
-              // The link identifies the referrer — never typed by the prospect (R2).
-              referredBy: office.owner || office.name,
+              sessionChosen: chosen ? label(chosen) : '',
+              referredBy: office.ownerName || office.name,
               officeName: office.name,
               officeId: office.id,
-              contractLink: contract ? signUrl(contract.token) : '',
-              contractName: contract?.template.name ?? '',
-              contractVersion: contract?.template.version ?? '',
+              contractLink: '',
+              contractName: '',
+              contractVersion: '',
             })
 
             setDone(true)
@@ -159,7 +197,7 @@ export default function Join() {
               Choose your session
             </label>
             <div className="space-y-2">
-              {discovery.map((s) => {
+              {sessions.map((s) => {
                 const on = session === s.id
                 return (
                   <button
@@ -174,7 +212,8 @@ export default function Join() {
                     style={
                       on
                         ? {
-                            background: 'linear-gradient(#1c1a15,#1c1a15) padding-box, var(--goldgrad) border-box',
+                            background:
+                              'linear-gradient(#1c1a15,#1c1a15) padding-box, var(--goldgrad) border-box',
                             border: '1px solid transparent',
                           }
                         : undefined
@@ -182,24 +221,35 @@ export default function Join() {
                   >
                     <CalendarDays size={17} strokeWidth={1.7} className="flex-none" />
                     <span className="flex-1">
-                      <span className="block text-[13.5px] font-semibold">{s.date}</span>
-                      <span className="block text-[11.5px] text-muted">{s.time}</span>
+                      <span className="block text-[13.5px] font-semibold">{formatSessionDate(s.dateOn)}</span>
+                      <span className="block text-[11.5px] text-muted">{s.timeLabel}</span>
                     </span>
-                    {on && <Check size={16} className="flex-none text-gold" />}
+                    {on && <Check size={16} className="flex-none" />}
                   </button>
                 )
               })}
             </div>
           </div>
 
-          <button type="submit" disabled={busy} className="btn-gold w-full py-[14px] disabled:opacity-60">
-            {busy ? 'Reserving…' : 'Reserve my seat'}
+          {error && (
+            <p role="alert" className="text-[12.5px] leading-relaxed text-bad">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="btn-gold w-full py-[15px] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? 'Saving your seat…' : 'Reserve my seat'}
           </button>
         </form>
       </div>
 
-      <p className="mt-5 text-center text-[11px] leading-relaxed text-muted">
-        By registering you'll receive session reminders by email and text. Standard message rates may apply.
+      <p className="mt-5 text-center text-[11.5px] leading-relaxed text-muted">
+        By registering you'll receive session reminders by email and text. Standard message rates may
+        apply.
       </p>
     </Shell>
   )
