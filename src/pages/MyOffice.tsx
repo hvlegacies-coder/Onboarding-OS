@@ -16,12 +16,15 @@ import Chip from '../components/ui/Chip'
 import Avatar from '../components/ui/Avatar'
 import StagePill from '../components/ui/StagePill'
 import { useAuth } from '../components/auth/auth'
-import { inviteUrl, officeById } from '../data/mock'
+import { useOffice, inviteUrlFor } from '../lib/useOffice'
 import { preparersForOffice, useProspects } from '../lib/prospectStore'
 import { CONTRACT_LABEL } from '../lib/contract'
 import { statusOf } from '../lib/contractStore'
 import { ghlConfigured, sendInvite, type InvitePayload } from '../lib/ghl'
-import type { ContractStatus, Office, Preparer, Stage } from '../types'
+import type { ContractStatus, Preparer, Stage } from '../types'
+
+/** All these components need of an office is who it is. */
+type OfficeLike = { id: string; name: string }
 
 /** The six milestones an owner cares about, in order. */
 const JOURNEY: { stage: Stage; label: string }[] = [
@@ -51,7 +54,7 @@ const TONE_COLOR = { good: '#7BC49A', gold: '#D4AF37', warn: '#E0B15A', bad: '#D
 
 export default function MyOffice() {
   const { session } = useAuth()
-  const office = officeById(session?.officeId)
+  const { office, loading: officeLoading } = useOffice(session?.officeId)
   const [filter, setFilter] = useState<ContractStatus | 'all'>('all')
 
   useProspects() // re-render when someone registers
@@ -62,6 +65,9 @@ export default function MyOffice() {
     return c
   }, [people])
 
+  // Wait for the lookup before deciding. Redirecting while it is still in
+  // flight bounced against the admin guard and left owners on a blank page.
+  if (officeLoading) return <div className="py-16 text-center text-[13px] text-muted">Loading your office…</div>
   // A platform operator has no single office — send them to the full funnel.
   if (!office) return <Navigate to="/" replace />
 
@@ -76,7 +82,7 @@ export default function MyOffice() {
       </PageHead>
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.55fr_1fr]">
-        <InviteCard office={office} url={inviteUrl(office)} />
+        <InviteCard office={office} url={inviteUrlFor(office.slug)} />
         <StatusStrip counts={counts} total={people.length} />
       </div>
 
@@ -117,7 +123,7 @@ export default function MyOffice() {
 
 /* ── Invite link ─────────────────────────────────────────── */
 
-function InviteCard({ office, url }: { office: Office; url: string }) {
+function InviteCard({ office, url }: { office: OfficeLike; url: string }) {
   const [copied, setCopied] = useState(false)
   const [inviting, setInviting] = useState(false)
   const copy = () => {
@@ -174,7 +180,7 @@ function InviteForm({
   url,
   onDone,
 }: {
-  office: Office
+  office: OfficeLike
   url: string
   onDone: () => void
 }) {

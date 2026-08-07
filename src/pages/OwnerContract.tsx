@@ -15,7 +15,7 @@ import ContractPaper from '../components/contract/ContractPaper'
 import SignatureInput, { type SignatureDraft } from '../components/contract/SignatureInput'
 import SentDocuments from '../components/contract/SentDocuments'
 import { useAuth } from '../components/auth/auth'
-import { officeById } from '../data/mock'
+import { useOffice } from '../lib/useOffice'
 import {
   TERM_LENGTHS,
   blankDetails,
@@ -33,9 +33,10 @@ type Tab = 'customize' | 'sent'
 export default function OwnerContract() {
   const { session } = useAuth()
   const store = useContracts()
-  const office = officeById(session?.officeId)
+  const { office, loading: officeLoading } = useOffice(session?.officeId)
   const [tab, setTab] = useState<Tab>('customize')
 
+  if (officeLoading) return <div className="py-16 text-center text-[13px] text-muted">Loading your office…</div>
   if (!office) return <Navigate to="/" replace />
 
   return (
@@ -78,7 +79,7 @@ function Customize({
   office,
   templates,
 }: {
-  office: ReturnType<typeof officeById> & {}
+  office: { id: string; name: string }
   templates: ContractTemplate[]
 }) {
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? '')
