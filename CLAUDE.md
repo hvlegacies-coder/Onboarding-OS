@@ -3,8 +3,9 @@
 ## What this is
 Higher View Onboarding OS: a productized, multi-tenant onboarding platform. Higher View is the
 first operator; each **Office Owner** is a white-label **tenant** with their own invite link,
-contract, logo, and business name. The prospect-facing experience is identical across offices —
-only the contract branding and owner notifications differ.
+contract, logo, and business name. The prospect-facing experience is the same form everywhere —
+it is headed by the inviting office's name, and beyond that only the contract branding and owner
+notifications differ.
 
 ## Stack & conventions
 - Vite + React 18 + TypeScript + Tailwind CSS v3. Routing via react-router-dom.
@@ -18,7 +19,8 @@ only the contract branding and owner notifications differ.
 
 ## Core domain rules (do not break)
 1. One standardized invitation form — no logos, no office selector. Office is resolved from the
-   unique link → Office ID, never from prospect input.
+   unique link → Office ID, never from prospect input. The form is headed by that office's name,
+   which is read from the slug; showing it is not a selector and does not break this rule.
 2. All contacts and pipeline stages live in one central account.
 3. The contract sent must match the inviting owner's Office ID (their logo, name, template).
 4. Contract follow-up: two reminders, then STOP automation and notify the owner.
