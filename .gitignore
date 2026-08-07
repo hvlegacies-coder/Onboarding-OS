@@ -1,0 +1,20 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+.vite
+
+# ── Secrets: never commit ─────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# Generated credential handouts. These hold real owner passwords in plain
+# text — they are produced on demand and must never enter version history,
+# because a commit cannot be un-published once it is pushed.
+Owner-Accounts.md
+owner-accounts.json
+Higher-View-Office-Credentials.pdf
+*-credentials.pdf
+*-accounts.md

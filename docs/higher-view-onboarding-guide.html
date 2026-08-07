@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Higher View Legacies — Onboarding Platform Guide</title>
+<style>
+  @page { size: Letter; margin: 18mm 16mm; }
+
+  :root {
+    --gold: #9a7b1f;
+    --goldlight: #c9a642;
+    --ink: #1a1a1a;
+    --soft: #5c5750;
+    --rule: #e2ddd0;
+    --wash: #faf7ef;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Calibri, system-ui, sans-serif;
+    font-size: 10.8pt;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+
+  h1, h2, h3, h4 { font-family: Georgia, "Times New Roman", serif; font-weight: 600; }
+  h1 { font-size: 26pt; line-height: 1.15; margin: 0 0 6pt; }
+  h2 {
+    font-size: 16pt; margin: 0 0 10pt; padding-bottom: 6pt;
+    border-bottom: 2px solid var(--gold); color: var(--gold);
+  }
+  h3 { font-size: 12.5pt; margin: 16pt 0 5pt; }
+  h4 { font-size: 11pt; margin: 12pt 0 3pt; }
+  p { margin: 0 0 8pt; }
+  ul, ol { margin: 0 0 8pt; padding-left: 16pt; }
+  li { margin-bottom: 4pt; }
+  strong { color: #000; }
+
+  .eyebrow {
+    font-family: "Segoe UI", sans-serif; font-size: 8pt; font-weight: 700;
+    letter-spacing: .22em; text-transform: uppercase; color: var(--gold); margin: 0 0 8pt;
+  }
+  .lede { font-size: 12pt; color: var(--soft); margin-bottom: 14pt; }
+
+  section { page-break-before: always; padding-top: 4pt; }
+  section.first { page-break-before: avoid; }
+  .keep { page-break-inside: avoid; }
+
+  /* Cover */
+  .cover { text-align: center; padding-top: 42mm; page-break-after: always; }
+  .cover h1 { font-size: 34pt; }
+  .cover .sub { font-size: 13pt; color: var(--soft); margin-top: 6pt; }
+  .cover .meta { margin-top: 30mm; font-size: 9.5pt; color: var(--soft); }
+  .mark { width: 108px; height: 108px; margin: 0 auto 18pt; display: block; }
+  .rule-gold { width: 70px; height: 3px; background: var(--gold); margin: 14pt auto; }
+
+  /* Blocks */
+  .box {
+    border: 1px solid var(--rule); background: var(--wash);
+    border-radius: 5px; padding: 10pt 12pt; margin: 10pt 0;
+  }
+  .box--gold { border-left: 3px solid var(--gold); }
+  .box--warn { border-left: 3px solid #b5761f; background: #fdf6ea; }
+  .box h4 { margin-top: 0; }
+
+  table { width: 100%; border-collapse: collapse; margin: 8pt 0 12pt; font-size: 9.8pt; }
+  th, td { text-align: left; padding: 6pt 8pt; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { background: var(--wash); font-size: 8.5pt; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+  td.num { width: 26pt; color: var(--gold); font-weight: 700; }
+
+  /* Journey steps */
+  .step { display: flex; gap: 10pt; margin-bottom: 9pt; page-break-inside: avoid; }
+  .step .n {
+    flex: 0 0 20pt; height: 20pt; border-radius: 50%; background: var(--gold);
+    color: #fff; font-weight: 700; font-size: 9.5pt; text-align: center; line-height: 20pt;
+  }
+  .step .t { flex: 1; }
+  .step .t b { display: block; font-size: 11pt; }
+  .step .who {
+    display: inline-block; font-size: 7.5pt; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .1em; padding: 1pt 5pt; border-radius: 8pt; margin-left: 6pt; vertical-align: 2pt;
+  }
+  .who--auto { background: #e8f1ea; color: #2f6b45; }
+  .who--owner { background: #f6ecd8; color: #8a6412; }
+  .who--hv { background: #eceaf5; color: #4a4477; }
+
+  code, .mono { font-family: Consolas, "Courier New", monospace; font-size: 9.5pt; }
+  .cred { background: #fff; border: 1px solid var(--rule); border-radius: 4px; padding: 8pt 10pt; margin-bottom: 6pt; }
+  .cred .role { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .1em; color: var(--gold); font-weight: 700; }
+
+  .status { font-weight: 700; }
+  .status--live { color: #2f6b45; }
+  .status--part { color: #8a6412; }
+  .status--no { color: #9c4b3c; }
+
+  .toc li { margin-bottom: 6pt; }
+  .toc b { color: var(--gold); }
+  footer.note { margin-top: 14pt; padding-top: 8pt; border-top: 1px solid var(--rule); font-size: 9pt; color: var(--soft); }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ COVER ══════════════ -->
+<div class="cover">
+  <svg class="mark" viewBox="0 0 240 240" aria-hidden="true">
+    <g fill="none" stroke="#9a7b1f" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter">
+      <path d="M52 92 L120 26 L188 92"/>
+      <path d="M44 132 L120 208 L196 132"/>
+      <path d="M37 100 H56 L104 148" stroke-width="10"/>
+      <path d="M32 122 H56 L100 166" stroke-width="10"/>
+      <path d="M203 100 H184 L136 148" stroke-width="10"/>
+      <path d="M208 122 H184 L140 166" stroke-width="10"/>
+    </g>
+    <path d="M110 34 H130 V124 L120 140 L110 124 Z" fill="#9a7b1f"/>
+    <circle cx="26" cy="100" r="8" fill="none" stroke="#9a7b1f" stroke-width="6"/>
+  </svg>
+
+  <h1>HIGHERVIEW LEGACIES</h1>
+  <div class="sub">Onboarding Platform — Plain-Language Guide</div>
+  <div class="rule-gold"></div>
+  <p style="max-width: 108mm; margin: 0 auto; color: var(--soft);">
+    What the system does, who uses it, and what happens at every step —
+    written for everyone on the team, not just the people who build it.
+  </p>
+  <div class="meta">
+    Version 0.1 · Working draft<br>
+    Prepared for Quianna, Michael, Jay, and Les
+  </div>
+</div>
+
+<!-- ══════════════ CONTENTS ══════════════ -->
+<section class="first">
+  <p class="eyebrow">Contents</p>
+  <h2>What's in this guide</h2>
+  <ol class="toc">
+    <li><b>The short version</b> — what this platform is, in one page.</li>
+    <li><b>Who uses it</b> — the three kinds of people involved.</li>
+    <li><b>What an Office Owner has to do</b> — the promise: only three things.</li>
+    <li><b>The journey, step by step</b> — from invitation to fully onboarded.</li>
+    <li><b>The screens</b> — a tour of every page and what it's for.</li>
+    <li><b>The rules that must never break</b> — five things that keep it trustworthy.</li>
+    <li><b>What works today vs. what's still coming</b> — an honest status check.</li>
+    <li><b>Test accounts</b> — how to log in and try it.</li>
+    <li><b>Words we use</b> — a glossary.</li>
+  </ol>
+
+  <div class="box box--gold">
+    <h4>How to read this</h4>
+    <p style="margin:0">
+      You don't need any technical background. Anywhere you see a word in <b>bold</b> for the first
+      time, it's explained in the glossary at the end. If you only read one section, read
+      <b>"The journey, step by step"</b> — that's the whole product in six minutes.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════ 1. SHORT VERSION ══════════════ -->
+<section>
+  <p class="eyebrow">Section 1</p>
+  <h2>The short version</h2>
+
+  <p class="lede">
+    Higher View recruits tax preparers. This platform takes over everything that happens between
+    "I'm interested" and "I'm trained and working" — so the people doing the recruiting can spend
+    their time on relationships instead of paperwork.
+  </p>
+
+  <h3>The problem it solves</h3>
+  <p>
+    Recruiting a preparer used to mean a long chain of manual steps: get their details, book them
+    into an info session, remember to remind them, send the right contract with the right logo on
+    it, chase them when they don't sign, tell someone when they've gone quiet, welcome them, book
+    their orientation, and get them into training. Miss one step and a good candidate quietly
+    disappears.
+  </p>
+
+  <h3>What the platform does instead</h3>
+  <p>
+    An <strong>Office Owner</strong> shares one link. Everything after that runs on its own:
+  </p>
+  <ul>
+    <li>The person fills in a short form and picks an info session.</li>
+    <li>They get a confirmation, a calendar invite, and reminders before the session.</li>
+    <li>About an hour after the session, their contract arrives — already branded with the correct office's logo and business name.</li>
+    <li>If they don't sign, the system nudges them twice, then stops and tells the owner to make a personal call.</li>
+    <li>When they sign, they're welcomed, booked into orientation, and given training access automatically.</li>
+  </ul>
+
+  <h3>Why it's built to be sold, not just used</h3>
+  <p>
+    Every office is kept separate — its own link, its own logo, its own contract — while sharing one
+    engine underneath. That's the same shape as a product you could license to any company with
+    multiple offices or franchises. Higher View is simply the first one using it.
+  </p>
+
+  <div class="box">
+    <h4>The one-sentence summary</h4>
+    <p style="margin:0">
+      <em>One link per office, one standard form for everyone, and an automated path that carries a
+      recruit from first contact to fully trained — with the right contract every single time.</em>
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════ 2. WHO USES IT ══════════════ -->
+<section>
+  <p class="eyebrow">Section 2</p>
+  <h2>Who uses it</h2>
+
+  <p>Three kinds of people touch this system, and they see completely different things.</p>
+
+  <h3>1. The Prospect (the person being recruited)</h3>
+  <p>
+    They see exactly one page, ever: a short sign-up form reached through the link their recruiter
+    sent them. No login, no account, no menus. They fill in their name, phone, email, and pick which
+    info session they want to attend. After that, everything reaches them by email and text.
+  </p>
+  <p>
+    Importantly, this form looks <strong>identical</strong> no matter which office invited them. No
+    logos, no office names, no dropdown asking who referred them to which branch. The system already
+    knows, because it's baked into the link.
+  </p>
+
+  <h3>2. The Office Owner</h3>
+  <p>
+    A leader who recruits preparers into their own office. They log in and see one page —
+    <strong>My Office</strong> — showing every person they've invited, where each one stands, and
+    whether their contract is signed. They also get their shareable link right at the top.
+  </p>
+  <p>
+    They only ever see their own people. An owner cannot see another office's prospects, numbers, or
+    contracts.
+  </p>
+
+  <h3>3. The Platform Operator (Higher View admin)</h3>
+  <p>
+    The Higher View team running the whole thing. They see everything: the full funnel across all
+    offices, every prospect, every contract, all the offices and their branding status, session
+    schedules, and the library of automated messages.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Person</th><th>Logs in?</th><th>What they see</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Prospect</strong></td><td>No — reaches the form by link</td><td>One sign-up form</td></tr>
+      <tr><td><strong>Office Owner</strong></td><td>Yes</td><td>Their own prospects and contracts only</td></tr>
+      <tr><td><strong>Platform Operator</strong></td><td>Yes</td><td>Everything, across all offices</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════ 3. OWNER PROMISE ══════════════ -->
+<section>
+  <p class="eyebrow">Section 3</p>
+  <h2>What an Office Owner actually has to do</h2>
+
+  <p class="lede">Three things. That's the promise the platform makes.</p>
+
+  <div class="step">
+    <div class="n">1</div>
+    <div class="t">
+      <b>Invite</b>
+      Send your link to someone you'd like to recruit. Text it, email it, post it — it doesn't
+      matter. Anyone who signs up through your link is automatically yours.
+    </div>
+  </div>
+  <div class="step">
+    <div class="n">2</div>
+    <div class="t">
+      <b>Build the relationship</b>
+      Coach them. Answer their questions. Be the human in the process while the system handles
+      the scheduling, the paperwork, and the reminders.
+    </div>
+  </div>
+  <div class="step">
+    <div class="n">3</div>
+    <div class="t">
+      <b>Support them</b>
+      Once they're signed and onboarded, train them on how your office specifically works.
+    </div>
+  </div>
+
+  <h3>Everything else is not your job</h3>
+  <table>
+    <thead>
+      <tr><th>The platform handles</th><th>You handle</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Hosting and scheduling the Discovery Session</td><td>Personal coaching and relationship building</td></tr>
+      <tr><td>All reminders, follow-ups, and escalations</td><td>Training specific to your office</td></tr>
+      <tr><td>Sending the correctly branded contract</td><td>Setting up your office's software</td></tr>
+      <tr><td>The welcome sequence and orientation</td><td>Culture and answering questions</td></tr>
+      <tr><td>Training community access and required modules</td><td>—</td></tr>
+      <tr><td>All tracking and communication</td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <div class="box box--gold">
+    <h4>The one moment the system hands something back to you</h4>
+    <p style="margin:0">
+      If someone doesn't sign their contract after two automatic reminders, the system
+      <strong>stops messaging them</strong> and flags them on your dashboard as
+      <em>"Needs your call."</em> That's deliberate. After two nudges, more automated messages just
+      feel like spam — what's needed is a real conversation. That's your job, and the platform
+      tells you exactly when it's time.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════ 4. THE JOURNEY ══════════════ -->
+<section>
+  <p class="eyebrow">Section 4</p>
+  <h2>The journey, step by step</h2>
+
+  <p class="lede">
+    Here's the entire path a recruit travels. The tag on each step tells you who does the work.
+  </p>
+  <p style="font-size:9.5pt; color:var(--soft)">
+    <span class="who who--owner">Owner</span> the office owner &nbsp;
+    <span class="who who--hv">Higher View</span> the Higher View team &nbsp;
+    <span class="who who--auto">Automatic</span> nobody — the system does it
+  </p>
+
+  <div class="step">
+    <div class="n">1</div>
+    <div class="t">
+      <b>The invitation <span class="who who--owner">Owner</span></b>
+      The owner shares their personal link. The moment someone opens it, the system already knows
+      which office they belong to — the recruit never has to say, and can never pick wrong.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">2</div>
+    <div class="t">
+      <b>Signing up <span class="who who--auto">Automatic</span></b>
+      The recruit fills in name, phone, email, and chooses one of the published info session dates.
+      They can add who referred them, but it's optional. They immediately get a confirmation email
+      and text with a calendar invite and the meeting link. The owner gets a notification that
+      someone registered.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">3</div>
+    <div class="t">
+      <b>Reminders before the session <span class="who who--auto">Automatic</span></b>
+      Reminders go out 24 hours before, 2 hours before, and 30 minutes before (that last one
+      includes the meeting link). If somebody signs up an hour before the session starts, they
+      simply get the 30-minute reminder and nothing that's already passed.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">4</div>
+    <div class="t">
+      <b>The Discovery Session <span class="who who--hv">Higher View</span></b>
+      A live session run by Higher View covering the company, the opportunity, compensation,
+      expectations, the contractor relationship, and training — then questions. Attendance is
+      recorded, because that's what triggers the contract.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">5</div>
+    <div class="t">
+      <b>The contract arrives <span class="who who--auto">Automatic</span></b>
+      Roughly 30–60 minutes after the session ends, the recruit receives their Independent
+      Contractor Agreement — carrying the <em>inviting owner's</em> logo, business name, and
+      contract template. If that office's branding hasn't been set up yet, the system deliberately
+      sends nothing and alerts an admin instead. A wrong contract is worse than a late one.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">6</div>
+    <div class="t">
+      <b>Two nudges, then a human <span class="who who--auto">Automatic</span></b>
+      If it isn't signed, a first reminder goes out, then a final one. Still unsigned after that,
+      automation stops completely and the owner is notified with the recruit's full details and a
+      simple instruction: reach out personally and find out whether they're still interested.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">7</div>
+    <div class="t">
+      <b>They sign <span class="who who--auto">Automatic</span></b>
+      A congratulations message goes out, their New Preparer Orientation gets scheduled, and their
+      Training Community access is granted automatically using the signed contract — no more
+      uploading anything to a website by hand.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">8</div>
+    <div class="t">
+      <b>New Preparer Orientation <span class="who who--hv">Higher View</span></b>
+      A separate session from the Discovery Session — this one is pure onboarding: the training
+      community, the portal, required modules, required meetings, support, and expectations. No
+      contract talk. These two sessions are never combined.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">9</div>
+    <div class="t">
+      <b>Welcome packet and training <span class="who who--auto">Automatic</span></b>
+      They receive their training community link, their checklist, contacts, and FAQ — and their
+      required modules are assigned: Due Diligence, Filing Statuses (Single, MFJ, MFS, HOH, QSS),
+      and Intro Tax Training.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="n">10</div>
+    <div class="t">
+      <b>Handed to the owner <span class="who who--owner">Owner</span></b>
+      Coaching begins. The automated part of the journey is complete.
+    </div>
+  </div>
+
+  <div class="box">
+    <h4>The stages you'll see on screen</h4>
+    <p style="margin:0">
+      Invitation sent → Discovery scheduled → Reminder sent → Attended → Contract sent →
+      Reminder #1 → Reminder #2 → <em>then either</em> Signed <em>or</em> Owner follow-up needed →
+      Orientation scheduled → Orientation completed → Training access sent → Modules assigned →
+      Coaching begins.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════ 5. THE SCREENS ══════════════ -->
+<section>
+  <p class="eyebrow">Section 5</p>
+  <h2>The screens</h2>
+
+  <h3>The sign-up form — what a recruit sees</h3>
+  <p>
+    Reached at a web address ending in <span class="mono">/join/</span> followed by the office's
+    name. It asks for four things and offers the available session dates. That's the entire
+    prospect-facing experience. If a link is broken or doesn't match a real office, the recruit sees
+    a polite "this link isn't valid, please ask for a new one" message rather than a form that would
+    file them under nobody.
+  </p>
+
+  <h3>The login page</h3>
+  <p>
+    Owners and Higher View staff sign in here, choosing whether they're signing in as an
+    <em>Admin</em> or an <em>Office Owner</em>. Recruits never log in at all.
+  </p>
+
+  <h3>My Office — the Office Owner's page</h3>
+  <p>This is the whole product for an owner. Top to bottom:</p>
+  <ul>
+    <li><strong>Your invite link</strong> — with a copy button and a preview button so you can see exactly what your recruits see.</li>
+    <li><strong>People who need your call</strong> — a red banner listing anyone whose contract stalled, with their phone and email one tap away. If nobody's stalled, the banner doesn't appear.</li>
+    <li><strong>Four counters</strong> — how many have no contract yet, how many are awaiting signature, how many have signed, and how many need a personal call.</li>
+    <li><strong>Everyone you've invited</strong> — one card per person showing their contact details, which session they're booked into, their current stage, their contract status, and a progress bar of how far along the journey they are. Each card ends with a plain-English line explaining what happens next.</li>
+    <li><strong>Filters</strong> — tap any status to narrow the list.</li>
+  </ul>
+
+  <h3>The Higher View admin console</h3>
+  <table>
+    <thead><tr><th>Page</th><th>What it's for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Overview</strong></td><td>The funnel across every office, plus a live activity feed.</td></tr>
+      <tr><td><strong>Pipeline</strong></td><td>Every prospect arranged by what stage they're in.</td></tr>
+      <tr><td><strong>Preparers</strong></td><td>The full searchable list of everyone in the system.</td></tr>
+      <tr><td><strong>Offices</strong></td><td>Every office, its invite link, its branding status, and its owner sign-in.</td></tr>
+      <tr><td><strong>Sessions</strong></td><td>Discovery Sessions and New Preparer Orientations, with registration counts.</td></tr>
+      <tr><td><strong>Contracts</strong></td><td>Every contract and where it stands.</td></tr>
+      <tr><td><strong>Messages</strong></td><td>The library of automated emails and texts, so you can see exactly what gets sent and when.</td></tr>
+      <tr><td><strong>Settings</strong></td><td>Reminder timings, session catalog, and required modules.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════ 6. RULES ══════════════ -->
+<section>
+  <p class="eyebrow">Section 6</p>
+  <h2>The five rules that must never break</h2>
+
+  <p class="lede">
+    These aren't preferences. If any one of them slips, the platform stops being trustworthy.
+  </p>
+
+  <table>
+    <tbody>
+      <tr>
+        <td class="num">1</td>
+        <td>
+          <strong>One standardized form.</strong> Every office uses the identical sign-up form. No
+          logos, no branding, no dropdown asking which office. <em>Why it matters:</em> the moment
+          offices get custom forms, you're maintaining six forms instead of one, and adding a
+          seventh office becomes a project instead of a checkbox.
+        </td>
+      </tr>
+      <tr>
+        <td class="num">2</td>
+        <td>
+          <strong>The link decides the office — never the recruit.</strong> Office attribution comes
+          from the unique link and nothing else. <em>Why it matters:</em> people pick the wrong item
+          from dropdowns constantly. A misattributed recruit gets the wrong contract and lands on
+          the wrong owner's dashboard.
+        </td>
+      </tr>
+      <tr>
+        <td class="num">3</td>
+        <td>
+          <strong>All contacts live in one central account.</strong> Not scattered across per-office
+          systems. <em>Why it matters:</em> one place to look, one funnel to measure, no records lost
+          between systems.
+        </td>
+      </tr>
+      <tr>
+        <td class="num">4</td>
+        <td>
+          <strong>The right contract, every single time.</strong> The contract must carry the
+          inviting owner's logo, business name, and template. If those aren't on file, the system
+          sends nothing and raises an alert. <em>Why it matters:</em> sending someone a contract with
+          another company's name on it is the kind of mistake that costs you the recruit.
+        </td>
+      </tr>
+      <tr>
+        <td class="num">5</td>
+        <td>
+          <strong>The two sessions are different things.</strong> The Discovery Session is the info
+          session for people deciding. The New Preparer Orientation is onboarding for people who
+          already signed. <em>Why it matters:</em> merging them means either boring signed preparers
+          with a sales pitch, or overwhelming undecided prospects with onboarding detail.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════ 7. STATUS ══════════════ -->
+<section>
+  <p class="eyebrow">Section 7</p>
+  <h2>What works today, and what doesn't yet</h2>
+
+  <p class="lede">
+    This is a working prototype of the screens, not yet a live system. Being clear about the line
+    between the two saves a lot of confusion in demos.
+  </p>
+
+  <table>
+    <thead><tr><th>Capability</th><th>Status</th><th>What that means</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>All the screens and navigation</td>
+        <td class="status status--live">Working</td>
+        <td>Every page is real, clickable, and shows the design as it will look.</td>
+      </tr>
+      <tr>
+        <td>Office invite links</td>
+        <td class="status status--live">Working</td>
+        <td>Each office's link genuinely opens that office's sign-up form.</td>
+      </tr>
+      <tr>
+        <td>The sign-up form</td>
+        <td class="status status--part">Partly</td>
+        <td>Fills in and confirms correctly, but doesn't yet save the person anywhere.</td>
+      </tr>
+      <tr>
+        <td>Logging in</td>
+        <td class="status status--part">Partly</td>
+        <td>Real email and password checks, but the accounts live in the app itself rather than on a secure server.</td>
+      </tr>
+      <tr>
+        <td>Owner sees only their own people</td>
+        <td class="status status--live">Working</td>
+        <td>Sign in as an office owner and you get that office's prospects only.</td>
+      </tr>
+      <tr>
+        <td>The prospect information shown</td>
+        <td class="status status--no">Sample data</td>
+        <td>Everyone listed is an example, not a real recruit.</td>
+      </tr>
+      <tr>
+        <td>Emails, texts, and reminders</td>
+        <td class="status status--no">Not connected</td>
+        <td>The message wording is written and visible, but nothing actually sends yet.</td>
+      </tr>
+      <tr>
+        <td>Contract sending and signature tracking</td>
+        <td class="status status--no">Not connected</td>
+        <td>Needs the contract platform hooked up.</td>
+      </tr>
+      <tr>
+        <td>Calendar invites</td>
+        <td class="status status--no">Not connected</td>
+        <td>Needs the shared calendar hooked up.</td>
+      </tr>
+      <tr>
+        <td>Training community access</td>
+        <td class="status status--no">Not connected</td>
+        <td>Needs the training platform hooked up.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>The four things blocking go-live</h3>
+  <ol>
+    <li><strong>Collect every office's contract, logo, and business name.</strong> Only one office is complete today. Until all of them are on file, contracts cannot send automatically — and the platform will correctly refuse to send rather than send the wrong one.</li>
+    <li><strong>Confirm the shared calendar and the session times.</strong></li>
+    <li><strong>Connect the contract platform</strong> so it can receive which office a recruit belongs to and report back when they've signed.</li>
+    <li><strong>Connect the training community</strong> so access is granted the moment someone signs.</li>
+  </ol>
+
+  <div class="box box--warn">
+    <h4>One security note worth understanding</h4>
+    <p style="margin:0">
+      Right now the login passwords are stored inside the app itself, which means anyone
+      technical enough could read them. That's completely normal for a prototype and fine for
+      demos — but those accounts must move to a proper secure server before any real recruit's
+      details go into the system. Treat today's passwords as demo passwords, and don't reuse them
+      anywhere that matters.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════ 8. TEST ACCOUNTS ══════════════ -->
+<section>
+  <p class="eyebrow">Section 8</p>
+  <h2>Trying it yourself</h2>
+
+  <h3>Signing in</h3>
+  <p>
+    Open the app and you'll land on the login page. Choose whether you're signing in as an
+    <strong>Admin</strong> or an <strong>Office Owner</strong>, then use one of the accounts below.
+    There's also a <em>"Demo access"</em> link on the login page that fills these in for you.
+  </p>
+
+  <div class="cred keep">
+    <div class="role">Platform Operator — sees everything</div>
+    <div class="mono">hvlegacies@gmail.com</div>
+    <div class="mono">Hello2026!</div>
+  </div>
+
+  <div class="cred keep">
+    <div class="role">Office Owner — Kinsley Financial</div>
+    <div class="mono">kinsley@kinsleyfinancial.co</div>
+    <div class="mono">Kinsley2026!</div>
+  </div>
+
+  <p style="font-size:9.5pt; color:var(--soft)">
+    Kinsley Financial is the office built out first, as the template. Once its dashboard is right,
+    the same setup gets duplicated for the other offices. Every office's owner sign-in is listed on
+    the admin console's <strong>Offices</strong> page.
+  </p>
+
+  <h3>A five-minute tour</h3>
+  <ol>
+    <li>Sign in as the <strong>Kinsley owner</strong>. You land on <em>My Office</em>.</li>
+    <li>Click the preview button next to your invite link — that's exactly what a recruit sees.</li>
+    <li>Fill the form in as if you were a recruit and submit it. You'll get the confirmation screen.</li>
+    <li>Go back and look at the red <em>"needs your call"</em> banner and the four counters.</li>
+    <li>Use the filters to see who's awaiting signature versus who has signed.</li>
+    <li>Sign out, then sign back in as the <strong>Platform Operator</strong> to see the whole business across every office.</li>
+  </ol>
+</section>
+
+<!-- ══════════════ 9. GLOSSARY ══════════════ -->
+<section>
+  <p class="eyebrow">Section 9</p>
+  <h2>Words we use</h2>
+
+  <table>
+    <tbody>
+      <tr><td style="width:34%"><strong>Office Owner</strong></td><td>A leader who recruits preparers. Each one gets their own link, contract, and branding.</td></tr>
+      <tr><td><strong>Prospect / Preparer</strong></td><td>Someone being recruited. We call them a preparer throughout, at every stage.</td></tr>
+      <tr><td><strong>Office ID</strong></td><td>The invisible tag that connects a recruit to the right owner, contract, and branding. Comes from the link — never typed by anyone.</td></tr>
+      <tr><td><strong>Invite link</strong></td><td>An owner's personal web address. The only way the system knows which office a recruit belongs to.</td></tr>
+      <tr><td><strong>Discovery Session</strong></td><td>The live info session for people still deciding. Not the official start.</td></tr>
+      <tr><td><strong>New Preparer Orientation</strong></td><td>The welcome and onboarding session, after the contract is signed. A different thing entirely.</td></tr>
+      <tr><td><strong>ICA</strong></td><td>Independent Contractor Agreement — the contract, branded per office.</td></tr>
+      <tr><td><strong>Training Community</strong></td><td>The private community and course portal a preparer joins once they've signed.</td></tr>
+      <tr><td><strong>Central account</strong></td><td>The single system where every recruit and every stage is tracked, across all offices.</td></tr>
+      <tr><td><strong>Pipeline / Stage</strong></td><td>Where someone is on the journey — from "invitation sent" through to "onboarded."</td></tr>
+      <tr><td><strong>White-label</strong></td><td>One system underneath, but each office sees their own branding on it. It's why this could be sold to other companies later.</td></tr>
+      <tr><td><strong>Multi-tenant</strong></td><td>Many separate offices sharing one platform without ever seeing each other's data.</td></tr>
+    </tbody>
+  </table>
+
+  <footer class="note">
+    Higher View Legacies — Onboarding Platform Guide · Version 0.1 working draft.<br>
+    This describes a prototype. Anything marked "not connected" in Section 7 does not yet send,
+    save, or sign anything.
+  </footer>
+</section>
+
+</body>
+</html>

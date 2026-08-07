@@ -1,0 +1,567 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bronze: #8c6a1e;
+  --gold: #d4af37;
+  --champagne: #f5d98b;
+  /* Multi-stop metallic gold — never a single flat accent */
+  --goldgrad: linear-gradient(140deg, var(--bronze) 0%, var(--champagne) 26%, var(--gold) 48%, var(--bronze) 74%, var(--champagne) 100%);
+  --goldtext: linear-gradient(180deg, #fbe7b3 0%, var(--gold) 45%, #b98f28 100%);
+  --shadow: 0 1px 0 rgba(245, 217, 139, 0.1) inset, 0 2px 5px rgba(0, 0, 0, 0.55), 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply font-sans text-ivory;
+    background:
+      radial-gradient(1100px 700px at 80% -10%, rgba(212, 175, 55, 0.1), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(140, 106, 30, 0.1), transparent 55%),
+      #0a0a0c;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: rgba(212, 175, 55, 0.28);
+    color: #fff;
+  }
+  *:focus-visible {
+    outline: 2px solid var(--champagne);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+@layer components {
+  /* Signature: milled gold bevel — bright top-left, dark bottom-right */
+  .bevel {
+    background: linear-gradient(#131316, #131316) padding-box, var(--goldgrad) border-box;
+    border: 1px solid transparent;
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+  /* Quiet surface — the default card. Gold bevels are for emphasis only. */
+  .panel {
+    background: #131316;
+    border: 1px solid rgba(212, 175, 55, 0.1);
+    border-radius: 14px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+  }
+  .panel-hover {
+    transition: border-color 0.25s, transform 0.25s;
+  }
+  .panel-hover:hover {
+    border-color: rgba(212, 175, 55, 0.26);
+    transform: translateY(-2px);
+  }
+  /* ── Signing: guided fill ─────────────────────────────── */
+  .fill-guide-bar {
+    position: fixed;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(212, 175, 55, 0.28);
+    background: rgba(19, 19, 22, 0.94);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.6);
+  }
+  .fill-pointer {
+    position: fixed;
+    z-index: 49;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #241a04;
+    background: var(--goldgrad);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    transform: translate(-100%, -50%);
+    white-space: nowrap;
+  }
+  .fill-field-active {
+    outline: 2px solid var(--champagne);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  .field-invalid {
+    outline: 2px solid #d08a7a;
+    outline-offset: 2px;
+    border-radius: 4px;
+    background: rgba(208, 138, 122, 0.12) !important;
+  }
+
+  /* ── Pipeline stage column ────────────────────────────── */
+  .stage-col {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease,
+      box-shadow 0.3s ease;
+  }
+  /* A milled gold edge that wipes in along the top of the column. */
+  .stage-col::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: var(--goldgrad);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .stage-col:hover {
+    transform: translateY(-4px);
+    border-color: rgba(212, 175, 55, 0.45);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55), 0 0 24px rgba(212, 175, 55, 0.13);
+  }
+  .stage-col:hover::before {
+    transform: scaleX(1);
+  }
+  /* Owner follow-up is an exception state — it glows in the danger tone. */
+  .stage-col--danger::before {
+    background: linear-gradient(90deg, #8c4a3c, #d08a7a 50%, #8c4a3c);
+  }
+  .stage-col--danger:hover {
+    border-color: rgba(208, 138, 122, 0.5);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55), 0 0 24px rgba(208, 138, 122, 0.16);
+  }
+  /* The count badge lifts with its column. */
+  .stage-col .stage-count {
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+  }
+  .stage-col:hover .stage-count {
+    transform: scale(1.12);
+    box-shadow: 0 0 14px rgba(212, 175, 55, 0.5);
+  }
+
+  /* ── Pipeline connectors ──────────────────────────────── */
+  /* The dashes travel left-to-right, so an automated hand-off reads as
+     something actively running rather than a static diagram arrow. */
+  .flow-line {
+    stroke-dasharray: 5 6;
+    animation: hv-flow 1.4s linear infinite;
+  }
+  .flow-conn:hover .flow-line {
+    animation-duration: 0.5s;
+  }
+  /* Owner follow-up is where automation stops, so its dashes hold still. */
+  .flow-conn--stop .flow-line {
+    animation: none;
+    stroke-dasharray: 3 5;
+  }
+  /* The caption brightens with its arrow so the pair reads as one control. */
+  .flow-label-static {
+    transition: color 0.25s ease;
+  }
+  .flow-conn:hover .flow-label-static {
+    color: var(--champagne);
+  }
+  .flow-head {
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .flow-conn:hover .flow-head {
+    transform: translateX(3px);
+  }
+
+  /* ── Office crest ─────────────────────────────────────── */
+  /* Same interaction language as the Higher View mark, so a white-labelled
+     office reads as part of the same system rather than a bolted-on badge. */
+  .office-mark {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.6));
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), filter 0.45s ease;
+    will-change: transform, filter;
+  }
+  .office-mark__aura {
+    position: absolute;
+    inset: -20%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(212, 175, 55, 0.38), transparent 68%);
+    opacity: 0;
+    transform: scale(0.75);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+    pointer-events: none;
+  }
+  .office-mark__sweep {
+    transform: translateX(0);
+  }
+  .office-mark--live:hover {
+    transform: translateY(-3px) scale(1.04);
+    filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.7))
+      drop-shadow(0 0 20px rgba(212, 175, 55, 0.45));
+  }
+  .office-mark--live:hover .office-mark__aura {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .office-mark--live:hover .office-mark__sweep {
+    animation: hv-sweep 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  /* The wordmark brightens with the crest — one hover target, one response. */
+  .brand-link:hover .office-mark {
+    transform: translateY(-3px) scale(1.04);
+  }
+  .brand-link .brand-name {
+    transition: filter 0.35s ease;
+  }
+  .brand-link:hover .brand-name {
+    filter: brightness(1.15);
+  }
+
+  .toast-in {
+    animation: hv-toast-in 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* ── Detail drawer ────────────────────────────────────── */
+  .drawer-scrim {
+    animation: hv-fade-in 0.2s ease;
+  }
+  .drawer-panel {
+    animation: hv-drawer-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  /* The vertical rule the journey timeline hangs off. */
+  .timeline-rail::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 10px;
+    bottom: 10px;
+    width: 1px;
+    background: rgba(212, 175, 55, 0.16);
+  }
+
+  /* Page content shares one measure so nothing stretches on wide monitors. */
+  .container-page {
+    width: 100%;
+    max-width: 1200px;
+    margin-inline: auto;
+  }
+  .gold-text {
+    background: var(--goldtext);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .gold-fill {
+    background: var(--goldgrad);
+  }
+  .eyebrow {
+    @apply font-semibold uppercase text-gold;
+    font-size: 10.5px;
+    letter-spacing: 0.28em;
+  }
+  .btn-gold {
+    @apply font-bold uppercase;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: #241a04;
+    border: none;
+    border-radius: 11px;
+    background: linear-gradient(180deg, #fcefc0, var(--gold) 52%, #a9821f);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 -2px 6px rgba(80, 58, 12, 0.6) inset, 0 8px 18px rgba(0, 0, 0, 0.5);
+    transition: filter 0.2s, transform 0.12s;
+    cursor: pointer;
+  }
+  .btn-gold:hover {
+    filter: brightness(1.06);
+  }
+  .btn-gold:active {
+    transform: translateY(1px);
+  }
+
+  /* ── Brand mark: extruded gold, glow + scan sweep on hover ── */
+  .hv-logo {
+    display: inline-grid;
+    place-items: center;
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.65));
+    transition: filter 0.45s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform, filter;
+  }
+  .hv-logo__aura {
+    position: absolute;
+    inset: -18%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(212, 175, 55, 0.35), transparent 68%);
+    opacity: 0;
+    transform: scale(0.75);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+    pointer-events: none;
+  }
+  .hv-logo__sweep {
+    transform: translateX(0);
+  }
+  .hv-logo__node {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .hv-logo--live:hover {
+    transform: translateY(-3px) scale(1.035);
+    filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 22px rgba(212, 175, 55, 0.5));
+  }
+  .hv-logo--live:hover .hv-logo__aura {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .hv-logo--live:hover .hv-logo__sweep {
+    animation: hv-sweep 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  .hv-logo--live:hover .hv-logo__node {
+    animation: hv-node 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes hv-flow {
+  to {
+    stroke-dashoffset: -22;
+  }
+}
+@keyframes hv-sweep {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(400px);
+  }
+}
+@keyframes hv-node {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.22);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   Print / Save-as-PDF — renders the agreement as a clean legal
+   document on white, matching the executed PDF rather than the
+   dark console it lives in.
+   ══════════════════════════════════════════════════════════ */
+@media print {
+  /*
+   * Zero page margins are what suppress the browser's own print header and
+   * footer — the URL, date, document title and "3/4" page counter, which are
+   * drawn inside the margin box and cannot be removed any other way from CSS.
+   * The document's real margins move onto .print-doc's padding below.
+   */
+  @page {
+    size: Letter;
+    margin: 0;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    height: auto !important;
+  }
+
+  /* Only the document prints. */
+  .no-print,
+  .fill-guide-bar,
+  .fill-pointer {
+    display: none !important;
+  }
+  body * {
+    visibility: hidden;
+    box-shadow: none !important;
+  }
+  .print-doc,
+  .print-doc * {
+    visibility: visible;
+  }
+  /*
+   * Everything on paper is black ink. The dark-theme utilities (text-ivory,
+   * text-champagne, text-muted, text-gold) are applied straight to the inner
+   * elements, so setting a colour on a container never reached them — the
+   * execution block in particular printed near-white on white. One blanket
+   * rule is the only thing that reliably covers every nested element.
+   */
+  .print-doc,
+  .print-doc * {
+    color: #000 !important;
+    /*
+     * Forces the light-blue field highlight to actually print. Chrome drops
+     * background colours unless "Background graphics" is ticked in the print
+     * dialog, and it is off by default — without this the fields come out as
+     * bare text and the form loses its shape.
+     */
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-doc {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    /* Stands in for the @page margin we had to zero out. Side padding applies
+       to every page; the vertical pair frames the first and last. */
+    padding: 0.9in 1in !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+    font-family: "Times New Roman", Times, Georgia, serif !important;
+    font-size: 11pt;
+    line-height: 1.38;
+  }
+
+  .print-doc img {
+    max-height: 62px !important;
+    margin: 0 auto 18pt !important;
+  }
+
+  /* Heading and body run together as one justified paragraph. */
+  .print-doc section {
+    display: block;
+    margin-bottom: 9pt;
+    text-align: justify;
+  }
+  .print-doc section h4 {
+    display: inline;
+    font-family: inherit !important;
+    font-size: 11pt !important;
+    font-weight: 700;
+    letter-spacing: 0 !important;
+    color: #000 !important;
+  }
+  .print-doc section h4::after {
+    content: " ";
+  }
+  .print-doc section p {
+    display: inline;
+    margin: 0 !important;
+    font-size: 11pt !important;
+    line-height: 1.38 !important;
+    color: #000 !important;
+    white-space: pre-wrap;
+  }
+  .print-doc section span {
+    color: #000 !important;
+  }
+
+  /* Completed blanks keep the filled-form look of the original. */
+  .print-doc input,
+  .print-doc .print-field {
+    display: inline !important;
+    width: auto !important;
+    min-width: 0 !important;
+    padding: 0 3px !important;
+    border: 1px solid #8ba0d0 !important;
+    border-radius: 0 !important;
+    background: #dce3f7 !important;
+    color: #000 !important;
+    font-family: inherit !important;
+    font-size: 11pt !important;
+    font-style: normal !important;
+    text-align: left;
+  }
+
+  /* Execution block: two columns of ruled lines. */
+  .print-doc .exec {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 28pt;
+    margin-top: 22pt !important;
+    padding-top: 0 !important;
+    border: none !important;
+    page-break-inside: avoid;
+  }
+  .print-doc .exec-line {
+    border-bottom: 1px solid #8ba0d0 !important;
+    background: #dce3f7 !important;
+    color: #000 !important;
+    padding: 2pt 4pt !important;
+    margin-bottom: 4pt;
+    font-size: 10.5pt;
+  }
+  .print-doc .exec-label {
+    color: #000 !important;
+  }
+  .print-doc .exec-party {
+    color: #000 !important;
+    font-weight: 400;
+    margin-bottom: 4pt;
+  }
+  /*
+   * On paper a signature is ink, not gold. `brightness(0)` collapses every
+   * opaque pixel to black while leaving transparency alone, so it blackens a
+   * drawn or uploaded signature whatever colour it was captured in — including
+   * ones already saved against a sent contract.
+   */
+  /*
+   * The logo rule above (max-height 62px, margin 0 auto 18pt) also matched the
+   * signature, which centred it and inflated its row to roughly double height.
+   * Reset those here so the signature sits inline on the "By:" line.
+   */
+  .print-doc .exec-sign img {
+    filter: brightness(0);
+    max-height: 20pt !important;
+    width: auto !important;
+    margin: 0 !important;
+    vertical-align: middle !important;
+  }
+  .print-doc .exec-sign {
+    align-items: center !important;
+    min-height: 0 !important;
+  }
+  .print-doc .exec-sign span {
+    color: #000 !important;
+  }
+}
+
+@keyframes hv-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes hv-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hv-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
