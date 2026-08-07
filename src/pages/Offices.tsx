@@ -50,7 +50,7 @@ export default function Offices() {
     <>
       <PageHead eyebrow="Tenants" title="Offices">
         {offices.length} white-label tenants, each with its own invite link, contract, and branding. Open an
-        office for its link, contract and sign-in.
+        office for its link and contract.
       </PageHead>
 
       <input
