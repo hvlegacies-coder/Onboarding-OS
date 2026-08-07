@@ -18,3 +18,9 @@ owner-accounts.json
 Higher-View-Office-Credentials.pdf
 *-credentials.pdf
 *-accounts.md
+
+.vercel
+
+# Build artifacts
+*.tsbuildinfo
+vite.config.js
