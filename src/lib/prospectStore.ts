@@ -98,11 +98,22 @@ let live = false
  * Pull the roster the signed-in user is allowed to see. Scope is decided by
  * RLS, not here. Call this after sign-in and after anything that writes.
  */
-export async function hydrateProspects() {
-  if (!supabaseReady) return
-  const { people, events } = await fetchProspects()
-  live = true
-  commit({ ...store, registered: people, events })
+let inFlight: Promise<void> | null = null
+
+export function hydrateProspects(): Promise<void> {
+  if (!supabaseReady) return Promise.resolve()
+  // getSession, onAuthStateChange and signIn all land within a moment of each
+  // other on a fresh sign-in. Share one request between them.
+  inFlight ??= (async () => {
+    try {
+      const { people, events } = await fetchProspects()
+      live = true
+      commit({ ...store, registered: people, events })
+    } finally {
+      inFlight = null
+    }
+  })()
+  return inFlight
 }
 
 /** Registrations first, then the seeded samples, with manual moves applied. */
@@ -261,5 +272,6 @@ export const findByEmail = (email: string) =>
 /** Drop the roster on sign-out so nothing survives into the next session. */
 export function clearProspects() {
   live = false
+  inFlight = null
   commit({ ...EMPTY })
 }
