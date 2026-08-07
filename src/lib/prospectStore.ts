@@ -1,5 +1,11 @@
 import { useSyncExternalStore } from 'react'
 import { offices, preparers as seedPreparers } from '../data/mock'
+import {
+  fetchProspects,
+  insertProspectEvent,
+  supabaseReady,
+  updateProspectStage,
+} from './supabase'
 import { sessionById } from './sessionStore'
 import type { Activity, Preparer, Stage } from '../types'
 
@@ -80,9 +86,29 @@ function subscribe(l: () => void) {
   }
 }
 
+/**
+ * True once the roster has been read from Supabase. Until then the seeded
+ * samples stand in, so a demo still has something to show; afterwards they are
+ * dropped entirely, because mixing sample people into a real office roster is
+ * worse than an empty one.
+ */
+let live = false
+
+/**
+ * Pull the roster the signed-in user is allowed to see. Scope is decided by
+ * RLS, not here. Call this after sign-in and after anything that writes.
+ */
+export async function hydrateProspects() {
+  if (!supabaseReady) return
+  const { people, events } = await fetchProspects()
+  live = true
+  commit({ ...store, registered: people, events })
+}
+
 /** Registrations first, then the seeded samples, with manual moves applied. */
 export function allPreparers(): Preparer[] {
-  return [...store.registered, ...seedPreparers].map((p) => {
+  const base = live ? store.registered : [...store.registered, ...seedPreparers]
+  return base.map((p) => {
     const moved = store.stages[p.id]
     if (!moved || moved === p.stage) return p
     // Signing is the only transition that stamps a date on the record.
@@ -193,6 +219,7 @@ export function logEvent(id: string, text: string, actor: PreparerEvent['actor']
     at: timeStamp(),
     stage,
   }
+  void insertProspectEvent(id, text, actor, stage)
   commit({ ...store, events: { ...store.events, [id]: [event, ...(store.events[id] ?? [])] } })
 }
 
@@ -202,6 +229,8 @@ export function logEvent(id: string, text: string, actor: PreparerEvent['actor']
  * seeded samples get an override, since `mock.ts` is read-only.
  */
 export function setStage(id: string, stage: Stage) {
+  // Optimistic locally so the UI moves at once; the database is the record.
+  void updateProspectStage(id, stage)
   commit({
     ...store,
     registered: store.registered.map((p) => (p.id === id ? { ...p, stage } : p)),
@@ -228,3 +257,9 @@ export function moveStage(p: Preparer, stage: Stage, label: string) {
 /** Match a registered prospect by email, so signing can move the right person. */
 export const findByEmail = (email: string) =>
   allPreparers().find((p) => p.email.toLowerCase() === email.trim().toLowerCase())
+
+/** Drop the roster on sign-out so nothing survives into the next session. */
+export function clearProspects() {
+  live = false
+  commit({ ...EMPTY })
+}

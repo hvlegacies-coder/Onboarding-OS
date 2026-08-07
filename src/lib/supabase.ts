@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import type { Preparer, Stage } from '../types'
 
 /**
  * The Supabase client.
@@ -129,4 +130,156 @@ export function formatSessionDate(iso: string) {
     month: 'short',
     day: 'numeric',
   })}`
+}
+
+/* ── Prospects ───────────────────────────────────────────── */
+
+/**
+ * Everyone the signed-in user is allowed to see. There is no office filter
+ * here on purpose: RLS decides the scope, so an admin gets every office and an
+ * owner gets only their own. Filtering here as well would only hide a policy
+ * mistake rather than prevent one.
+ */
+export async function fetchProspects(): Promise<{
+  people: Preparer[]
+  events: Record<string, PreparerEventRow[]>
+}> {
+  if (!supabase) return { people: [], events: {} }
+
+  const { data, error } = await supabase
+    .from('prospects')
+    .select(
+      'id,name,email,phone,stage,invited_on,signed_on,referred_by,owner_id,' +
+        'owners(name,company_name),sessions(date_on,time_label)',
+    )
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('fetchProspects', error.message)
+    return { people: [], events: {} }
+  }
+
+  // The client is untyped, so PostgREST can't infer the shape of an embedded
+  // select. This describes what the query above actually returns.
+  const rows = (data ?? []) as unknown as ProspectRow[]
+
+  const people: Preparer[] = rows.map((r) => {
+    const office = one(r.owners)
+    const session = one(r.sessions)
+    return {
+      id: String(r.id),
+      name: String(r.name),
+      email: String(r.email),
+      phone: String(r.phone ?? ''),
+      initials: initialsOf(String(r.name)),
+      officeId: String(r.owner_id),
+      office: String(office?.company_name || office?.name || 'Unknown office'),
+      stage: r.stage as Stage,
+      session: session ? `${formatSessionDate(session.date_on)} · ${session.time_label}` : '—',
+      invited: shortDate(String(r.invited_on)),
+      referredBy: (r.referred_by as string) || undefined,
+      signedOn: r.signed_on ? shortDate(String(r.signed_on)) : undefined,
+    }
+  })
+
+  const ids = people.map((p) => p.id)
+  const events: Record<string, PreparerEventRow[]> = {}
+  if (ids.length) {
+    const { data: evs } = await supabase
+      .from('prospect_events')
+      .select('id,prospect_id,actor,body,stage,created_at')
+      .in('prospect_id', ids)
+      .order('created_at', { ascending: false })
+    for (const e of (evs ?? []) as unknown as EventRow[]) {
+      ;(events[String(e.prospect_id)] ??= []).push({
+        id: String(e.id),
+        actor: e.actor === 'manual' ? 'manual' : 'automation',
+        text: String(e.body),
+        at: stamp(String(e.created_at)),
+        stage: (e.stage as Stage) ?? undefined,
+      })
+    }
+  }
+
+  return { people, events }
+}
+
+interface ProspectRow {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  stage: Stage
+  invited_on: string
+  signed_on: string | null
+  referred_by: string | null
+  owner_id: string
+  owners: { name: string | null; company_name: string | null } | null
+  sessions: { date_on: string; time_label: string } | null
+}
+
+interface EventRow {
+  id: string
+  prospect_id: string
+  actor: string
+  body: string
+  stage: Stage | null
+  created_at: string
+}
+
+export interface PreparerEventRow {
+  id: string
+  actor: 'automation' | 'manual'
+  text: string
+  at: string
+  stage?: Stage
+}
+
+/** Move someone along the pipeline. Signing is what stamps a date (R5). */
+export async function updateProspectStage(id: string, stage: Stage) {
+  if (!supabase) return
+  const patch: Record<string, unknown> = { stage }
+  if (stage === 'signed') patch.signed_on = new Date().toISOString().slice(0, 10)
+  const { error } = await supabase.from('prospects').update(patch).eq('id', id)
+  if (error) console.error('updateProspectStage', error.message)
+}
+
+export async function insertProspectEvent(
+  prospectId: string,
+  body: string,
+  actor: 'automation' | 'manual',
+  stage?: Stage,
+) {
+  if (!supabase) return
+  const { error } = await supabase
+    .from('prospect_events')
+    .insert({ prospect_id: prospectId, body, actor, stage: stage ?? null })
+  if (error) console.error('insertProspectEvent', error.message)
+}
+
+/** PostgREST types an embedded row as an array; at most one comes back here. */
+const one = <T>(v: T | T[] | null): T | undefined =>
+  (Array.isArray(v) ? v[0] : v) ?? undefined
+
+const initialsOf = (name: string) =>
+  name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?'
+
+const shortDate = (iso: string) => {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00`)
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+const stamp = (iso: string) => {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString('en-US', {
+        timeZone: 'America/New_York',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
 }

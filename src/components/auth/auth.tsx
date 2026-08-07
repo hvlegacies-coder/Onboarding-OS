@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { supabase, supabaseReady } from '../../lib/supabase'
+import { clearProspects, hydrateProspects } from '../../lib/prospectStore'
 
 export type Role = 'admin' | 'owner'
 
@@ -90,6 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(s)
         setLoading(false)
       }
+      // The roster is read under RLS, so it can only be loaded once there is a
+      // session to be scoped by.
+      if (s) void hydrateProspects()
     })
 
     // Keeps other tabs in step and picks up token refreshes.
@@ -97,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const u = next?.user
       const s = u ? await loadSession(u.id, u.email ?? '') : null
       if (!cancelled) setSession(s)
+      if (s) void hydrateProspects()
     })
 
     return () => {
@@ -116,12 +121,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: false, error: 'That account is not linked to an office yet.' }
     }
     setSession(s)
+    void hydrateProspects()
     return { ok: true }
   }
 
   const signOut = async () => {
     await supabase?.auth.signOut()
     setSession(null)
+    clearProspects()
   }
 
   return (
