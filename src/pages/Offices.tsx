@@ -21,7 +21,6 @@ import {
   officeBranding,
   useContracts,
 } from '../lib/contractStore'
-import { isPasswordChanged, passwordFor, resetPassword, setPassword, useOfficeCreds } from '../lib/officeStore'
 import { useProspects } from '../lib/prospectStore'
 import type { BrandingStatus, Office } from '../types'
 
@@ -33,7 +32,6 @@ const brand: Record<BrandingStatus, { label: string; tone: 'good' | 'warn' }> = 
 
 export default function Offices() {
   const { preparers } = useProspects()
-  useOfficeCreds()
   // Only one office is open at a time — the point is a scannable index.
   const [openId, setOpenId] = useState<string | null>(null)
   const [q, setQ] = useState('')
@@ -121,7 +119,6 @@ function OfficeRow({
           </div>
           <LinkRow url={inviteUrl(office)} />
           <TemplatePicker officeId={office.id} />
-          <OwnerAccess office={office} />
         </div>
       )}
     </div>
@@ -189,95 +186,3 @@ function TemplatePicker({ officeId }: { officeId: string }) {
   )
 }
 
-/** Prototype owner sign-in, with a way to rotate the password. */
-function OwnerAccess({ office }: { office: Office }) {
-  const [shown, setShown] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-  const [saved, setSaved] = useState(false)
-
-  const password = passwordFor(office)
-  const changed = isPasswordChanged(office)
-
-  const copy = () => {
-    navigator.clipboard?.writeText(`${office.ownerUsername} / ${password}`)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1400)
-  }
-
-  const save = () => {
-    if (draft.trim().length < 6) return
-    setPassword(office.id, draft.trim())
-    setDraft('')
-    setEditing(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
-
-  return (
-    <div className="mt-2 rounded-[9px] border border-[rgba(212,175,55,.16)] bg-graphite px-[11px] py-[9px]">
-      <div className="flex items-center gap-2">
-        <KeyRound size={12} className="flex-none text-gold" />
-        <span className="flex-1 text-[10.5px] uppercase tracking-[0.12em] text-muted">Owner sign-in</span>
-        {changed && <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-good">Changed</span>}
-        <button onClick={() => setShown((v) => !v)} aria-label={shown ? 'Hide password' : 'Show password'} className="text-muted hover:text-gold">
-          {shown ? <EyeOff size={13} /> : <Eye size={13} />}
-        </button>
-        <button onClick={copy} aria-label="Copy credentials" className="text-muted hover:text-gold">
-          {copied ? <Check size={13} className="text-good" /> : <Copy size={13} />}
-        </button>
-      </div>
-
-      <div className="mt-1 font-mono text-[11.5px] text-ivory">{office.ownerUsername}</div>
-      <div className="font-mono text-[11.5px] text-ivory">{shown ? password : '•'.repeat(12)}</div>
-
-      {editing ? (
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          <input
-            autoFocus
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && save()}
-            placeholder="New password (min 6 characters)"
-            aria-label={`New password for ${office.name}`}
-            className="min-w-0 flex-1 rounded-[7px] border border-[rgba(212,175,55,.2)] bg-obsidian px-2.5 py-1.5 font-mono text-[11.5px] text-ivory outline-none focus:border-[rgba(212,175,55,.5)]"
-          />
-          <button
-            onClick={save}
-            disabled={draft.trim().length < 6}
-            className="btn-gold px-3 py-1.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Save
-          </button>
-          <button
-            onClick={() => {
-              setEditing(false)
-              setDraft('')
-            }}
-            className="text-[11px] text-muted hover:text-ivory"
-          >
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <div className="mt-2.5 flex items-center gap-3">
-          <button onClick={() => setEditing(true)} className="text-[11px] font-semibold text-gold hover:text-champagne">
-            Change password
-          </button>
-          {changed && (
-            <button
-              onClick={() => resetPassword(office.id)}
-              title="Restore the original password"
-              className="flex items-center gap-1 text-[11px] text-muted transition-colors hover:text-ivory"
-            >
-              <RotateCcw size={11} /> Reset
-            </button>
-          )}
-          {saved && <span className="text-[11px] text-good">Password updated</span>}
-        </div>
-      )}
-    </div>
-  )
-}

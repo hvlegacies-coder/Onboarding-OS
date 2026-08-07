@@ -134,7 +134,7 @@ export function buildContext(scope: Scope): string {
     const tpl = assignedTemplateId(o.id)
     const missing = tpl ? missingOfficeDetails(o.id, tpl) : ['no template assigned']
     const count = people.filter((p) => p.officeId === o.id).length
-    return `- ${o.name} (id: ${o.id}, link: /join/${o.slug}, username: ${o.ownerUsername})${
+    return `- ${o.name} (id: ${o.id}, link: /join/${o.slug})${
       o.owner ? ` · owner: ${o.owner}` : ' · owner name not collected'
     } · ${count} preparers · contract ${
       missing.length ? `NOT ready — missing: ${missing.join(', ')}` : 'ready to send'

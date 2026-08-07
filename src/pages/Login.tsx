@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { passwordFor } from '../lib/officeStore'
 import {
   Building2,
   ChevronDown,
@@ -16,7 +15,6 @@ import {
   UserRound,
 } from 'lucide-react'
 import { useAuth, type Role } from '../components/auth/auth'
-import { offices } from '../data/mock'
 import Logo from '../components/ui/Logo'
 
 /** Only operators and owners sign in — preparers arrive by invite link (R1/R2). */

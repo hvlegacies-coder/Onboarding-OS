@@ -24,9 +24,6 @@ export interface Office {
   initials: string
   /** URL segment that resolves to this Office ID. The only attribution mechanism (R2). */
   slug: string
-  /** Owner sign-in handle for the office dashboard. Prototype only — see mock.ts. */
-  ownerUsername: string
-  ownerPassword: string
   branding: BrandingStatus
 }
 
