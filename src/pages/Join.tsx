@@ -134,7 +134,12 @@ export default function Join() {
   return (
     <Shell>
       <div className="bevel p-5 sm:p-8">
-        <div className="eyebrow">Higher View</div>
+        {/*
+          The office that owns the link, not the platform. Still no logo and no
+          selector — the name is read from the slug the prospect arrived on, so
+          it identifies who invited them without them ever choosing an office.
+        */}
+        <div className="eyebrow">{office.name}</div>
         <h1 className="mt-3 font-cinzel text-[27px] font-semibold leading-tight text-ivory">
           Join the Discovery Session
         </h1>
