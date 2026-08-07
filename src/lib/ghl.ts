@@ -95,6 +95,10 @@ export interface RegistrationPayload {
    * one and still write the pretty version into the email.
    */
   sessionAt: string
+  /** IANA zone the session time is quoted in — never a fixed EST/EDT label. */
+  sessionTimezone: string
+  /** The same instant with its real offset: '2026-08-09T18:00:00-04:00'. */
+  sessionAtIso: string
   /** The owner whose link they used — derived, never typed (R2). */
   referredBy: string
   officeName: string

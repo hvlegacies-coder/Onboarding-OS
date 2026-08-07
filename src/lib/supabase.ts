@@ -299,3 +299,51 @@ export function sessionDateTime(dateOn: string, timeLabel: string): string {
   if (!m) return date
   return `${date} ${m[1].padStart(2, '0')}:${m[2]} ${m[3].toUpperCase()}M`
 }
+
+/**
+ * Sessions are quoted in Eastern time. This is the IANA zone, not a fixed
+ * "EST": Eastern is EST (UTC-5) only from November to March and EDT (UTC-4)
+ * the rest of the year, so pinning EST would put every summer session an hour
+ * out. Anything consuming these values should use the zone, not the label.
+ */
+export const SESSION_TZ = 'America/New_York'
+
+/** The zone's offset in minutes at a given instant, DST included. */
+function zoneOffsetMinutes(instant: Date, tz: string): number {
+  const name =
+    new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' })
+      .formatToParts(instant)
+      .find((p) => p.type === 'timeZoneName')?.value ?? 'GMT+00:00'
+  const m = name.match(/GMT([+-])(\d{2}):(\d{2})/)
+  if (!m) return 0
+  return (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3]))
+}
+
+/** Wall-clock parts of a session, or null when the label carries no time. */
+function sessionParts(dateOn: string, timeLabel: string) {
+  const [y, mo, d] = dateOn.slice(0, 10).split('-').map(Number)
+  const m = timeLabel.match(/(\d{1,2}):(\d{2})\s*([AaPp])\.?[Mm]/)
+  if (!m || !y || !mo || !d) return null
+  let h = Number(m[1]) % 12
+  if (m[3].toUpperCase() === 'P') h += 12
+  return { y, mo, d, h, mi: Number(m[2]) }
+}
+
+/**
+ * The session as an unambiguous instant, e.g. `2026-08-09T18:00:00-04:00`.
+ * Carries the real offset for that date, so a consumer cannot land on the
+ * wrong hour whatever its own timezone setting happens to be.
+ */
+export function sessionIso(dateOn: string, timeLabel: string): string {
+  const p = sessionParts(dateOn, timeLabel)
+  if (!p) return ''
+  const guess = Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi)
+  // The offset depends on the instant and the instant on the offset; re-read
+  // the zone once the first correction is applied so DST changeovers settle.
+  let off = zoneOffsetMinutes(new Date(guess), SESSION_TZ)
+  off = zoneOffsetMinutes(new Date(guess - off * 60000), SESSION_TZ)
+  const a = Math.abs(off)
+  const label = `${off < 0 ? '-' : '+'}${String(Math.floor(a / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}`
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${dateOn.slice(0, 10)}T${pad(p.h)}:${pad(p.mi)}:00${label}`
+}
