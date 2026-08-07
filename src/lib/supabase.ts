@@ -283,3 +283,19 @@ const stamp = (iso: string) => {
         minute: '2-digit',
       })
 }
+
+/**
+ * The chosen session as a timestamp GoHighLevel can parse, e.g.
+ * `2026-08-09 06:00 PM`. GHL accepts `YYYY-MM-DD HH:MM A` and reads it in the
+ * location's own timezone, so this emits local wall time with no offset.
+ *
+ * `timeLabel` is a display string ("6:00 PM ET · Zoom"), so the clock time is
+ * pulled out of it. If it ever stops carrying one, the date alone goes out
+ * rather than an invented time.
+ */
+export function sessionDateTime(dateOn: string, timeLabel: string): string {
+  const date = dateOn.slice(0, 10)
+  const m = timeLabel.match(/(\d{1,2}):(\d{2})\s*([AaPp])\.?[Mm]/)
+  if (!m) return date
+  return `${date} ${m[1].padStart(2, '0')}:${m[2]} ${m[3].toUpperCase()}M`
+}

@@ -87,7 +87,14 @@ export interface RegistrationPayload {
   fullName: string
   phone: string
   email: string
+  /** Human-readable, for the message body: 'Sun · Aug 9 · 6:00 PM ET · Zoom'. */
   sessionChosen: string
+  /**
+   * The same session as 'YYYY-MM-DD HH:MM A' — the format GHL parses into a
+   * date field. Kept alongside sessionChosen so the workflow can schedule from
+   * one and still write the pretty version into the email.
+   */
+  sessionAt: string
   /** The owner whose link they used — derived, never typed (R2). */
   referredBy: string
   officeName: string
