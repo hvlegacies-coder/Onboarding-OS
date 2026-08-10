@@ -1,77 +1,95 @@
-import { useSyncExternalStore } from 'react'
-import { sessions as seedSessions } from '../data/mock'
+import { useEffect, useSyncExternalStore } from 'react'
+import {
+  deleteSession,
+  fetchSessions,
+  insertSession,
+  supabaseReady,
+  type SessionRow,
+} from './supabase'
 import type { Session } from '../types'
 
 /**
- * The session calendar — the seeded samples plus anything an admin adds.
+ * The session calendar, read from and written to Supabase.
  *
  * This is the single catalog every surface reads: the Sessions page, and the
  * public invitation form behind every office's invite link. Adding a Discovery
  * Session here is what makes it selectable to prospects, with no per-office
- * step, because all 49 offices share one calendar.
+ * step, because all offices share one calendar.
  *
- * Persisted to localStorage, like the other stores — swap read/commit for API
- * calls when the real calendar is wired up.
+ * The console used to keep its own copy in localStorage. That made this page a
+ * private notepad — the invitation form has always read the database, so a
+ * session published here reached nobody. One calendar, in one place.
  */
 
-const KEY = 'hv_sessions_v1'
-
-interface SessionStore {
-  /** Sessions created in the console. */
-  created: Session[]
-  /** Seeded ids that have been removed, so they stay removed across reloads. */
-  hidden: string[]
-}
-
-const EMPTY: SessionStore = { created: [], hidden: [] }
-
-function read(): SessionStore {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return EMPTY
-    const p = JSON.parse(raw) as SessionStore
-    p.created ??= []
-    p.hidden ??= []
-    return p
-  } catch {
-    return EMPTY
-  }
-}
-
-let store = read()
+let store: Session[] = []
+/** True once the calendar has been read from the database. */
+let live = false
 const listeners = new Set<() => void>()
 
-function commit(next: SessionStore) {
+function commit(next: Session[]) {
   store = next
-  localStorage.setItem(KEY, JSON.stringify(next))
   listeners.forEach((l) => l())
 }
 
 function subscribe(l: () => void) {
   listeners.add(l)
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === KEY) {
-      store = read()
-      l()
-    }
-  }
-  window.addEventListener('storage', onStorage)
   return () => {
     listeners.delete(l)
-    window.removeEventListener('storage', onStorage)
   }
 }
 
-/** Every session, soonest first. Undated seeds keep their original order. */
+/** "2026-08-09" -> "Sun · Aug 9" */
+function displayDate(iso: string) {
+  const d = new Date(`${iso}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return iso
+  const wd = d.toLocaleDateString('en-US', { weekday: 'short' })
+  const md = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${wd} · ${md}`
+}
+
+const defaultNote = (kind: string) =>
+  kind === 'Discovery Session' ? 'open for registration' : 'signed preparers invited'
+
+const toSession = (r: SessionRow): Session => ({
+  id: r.id,
+  type: r.kind === 'New Preparer Orientation' ? 'New Preparer Orientation' : 'Discovery Session',
+  dateIso: r.dateOn,
+  date: displayDate(r.dateOn),
+  time: r.timeLabel,
+  registered: r.registered,
+  note: r.note || defaultNote(r.kind),
+})
+
+let inFlight: Promise<void> | null = null
+
+/** Pull the calendar. Safe to call from anywhere — concurrent calls share one request. */
+export function hydrateSessions(): Promise<void> {
+  if (!supabaseReady) return Promise.resolve()
+  inFlight ??= (async () => {
+    try {
+      const rows = await fetchSessions()
+      live = true
+      commit(rows.map(toSession))
+    } finally {
+      inFlight = null
+    }
+  })()
+  return inFlight
+}
+
+/** Every session, soonest first. Undated rows keep their original order. */
 export function allSessions(): Session[] {
-  return [...store.created, ...seedSessions]
-    .filter((s) => !store.hidden.includes(s.id))
-    .sort((a, b) => (a.dateIso ?? '9999').localeCompare(b.dateIso ?? '9999'))
+  return [...store].sort((a, b) => (a.dateIso ?? '9999').localeCompare(b.dateIso ?? '9999'))
 }
 
 export function useSessions() {
   useSyncExternalStore(subscribe, () => store, () => store)
-  return { sessions: allSessions(), isCustom: (id: string) => store.created.some((s) => s.id === id) }
+  // Re-read on mount: another admin may have changed the calendar since this
+  // tab last looked at it.
+  useEffect(() => {
+    void hydrateSessions()
+  }, [])
+  return { sessions: allSessions(), loading: supabaseReady && !live }
 }
 
 export const sessionById = (id: string | undefined) =>
@@ -97,15 +115,6 @@ export interface SessionInput {
   note: string
 }
 
-/** "2026-08-09" -> "Sun · Aug 9" */
-function displayDate(iso: string) {
-  const d = new Date(`${iso}T00:00:00`)
-  if (Number.isNaN(d.getTime())) return iso
-  const wd = d.toLocaleDateString('en-US', { weekday: 'short' })
-  const md = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  return `${wd} · ${md}`
-}
-
 /** "18:00" -> "6:00 PM ET · Zoom" */
 function displayTime(time: string, place: string) {
   const [h, m] = time.split(':').map(Number)
@@ -116,26 +125,27 @@ function displayTime(time: string, place: string) {
   return place ? `${clock} · ${place}` : clock
 }
 
-export function createSession(input: SessionInput): Session {
-  const session: Session = {
-    id: `ses-${Date.now().toString(36)}`,
-    type: input.type,
-    dateIso: input.dateIso,
-    date: displayDate(input.dateIso),
-    time: displayTime(input.time, input.place.trim()),
-    // Real registrations accrue from the invitation form; nothing is invented.
-    registered: 0,
-    note:
-      input.note.trim() ||
-      (input.type === 'Discovery Session' ? 'open for registration' : 'signed preparers invited'),
-  }
-  commit({ ...store, created: [session, ...store.created] })
-  return session
+export async function createSession(
+  input: SessionInput,
+): Promise<{ ok: true; session: Session } | { ok: false; error: string }> {
+  const res = await insertSession({
+    kind: input.type,
+    dateOn: input.dateIso,
+    timeLabel: displayTime(input.time, input.place.trim()),
+    note: input.note.trim(),
+  })
+  if (!res.ok) return res
+
+  const session = toSession(res.row)
+  commit([...store, session])
+  return { ok: true, session }
 }
 
-export function removeSession(id: string) {
-  commit({
-    created: store.created.filter((s) => s.id !== id),
-    hidden: store.created.some((s) => s.id === id) ? store.hidden : [...store.hidden, id],
-  })
+export async function removeSession(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await deleteSession(id)
+  if (!res.ok) return res
+  commit(store.filter((s) => s.id !== id))
+  return { ok: true }
 }

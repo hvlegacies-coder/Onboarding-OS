@@ -84,12 +84,7 @@ export const preparersByOffice = (officeId: string) =>
 
 export const officeById = (id: string | undefined) => offices.find((o) => o.id === id)
 
-/**
- * The calendar starts empty — add real Discovery Sessions on the Sessions page.
- * A Discovery Session must exist before any prospect can book through an
- * invite link.
- */
-export const sessions: Session[] = [] // the real calendar lives in Supabase
+/* The calendar is read straight from Supabase — see `lib/sessionStore.ts`. */
 
 export const requiredModules: string[] = [
   'Due Diligence',

@@ -11,10 +11,22 @@ import type { Session } from '../types'
 const TYPES: Session['type'][] = ['Discovery Session', 'New Preparer Orientation']
 
 export default function Sessions() {
-  const { sessions, isCustom } = useSessions()
+  const { sessions, loading } = useSessions()
   const [adding, setAdding] = useState(false)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [removing, setRemoving] = useState(false)
   const bookable = sessions.filter((s) => s.type === 'Discovery Session').length
+
+  const remove = async (s: Session) => {
+    setRemoving(true)
+    const res = await removeSession(s.id)
+    setRemoving(false)
+    setConfirmId(null)
+    notify(
+      res.ok ? `${s.type} on ${s.date} removed` : `Couldn't remove it — ${res.error}`,
+      'bad',
+    )
+  }
 
   return (
     <>
@@ -41,11 +53,6 @@ export default function Sessions() {
           <div key={s.id} className="bevel group relative p-4 sm:p-[22px] transition-transform duration-200 hover:-translate-y-1">
             <div className="flex items-start justify-between gap-2">
               <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gold">{s.type}</div>
-              {isCustom(s.id) && (
-                <span className="rounded-full border border-[rgba(123,196,154,.3)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-[0.08em] text-good">
-                  Added
-                </span>
-              )}
             </div>
             <div className="mt-3 font-cormorant text-[30px] font-semibold leading-none">{s.date}</div>
             <div className="mt-1.5 text-[13px]">{s.time}</div>
@@ -83,25 +90,24 @@ export default function Sessions() {
                   {s.registered > 0 && (
                     <>
                       {' '}
-                      <b className="text-bad">{s.registered} already registered</b> — they keep their
-                      booking, but nobody new can join.
+                      <b className="text-bad">{s.registered} already booked on it</b> — they keep
+                      their place in the pipeline, but their session goes blank and they have to be
+                      re-booked by hand.
                     </>
                   )}
                 </p>
                 <div className="mt-3 flex gap-2">
                   <button
-                    onClick={() => {
-                      removeSession(s.id)
-                      setConfirmId(null)
-                      notify(`${s.type} on ${s.date} removed`, 'bad')
-                    }}
-                    className="rounded-[8px] border border-[rgba(208,138,122,.5)] bg-[rgba(208,138,122,.12)] px-3 py-1.5 text-[11.5px] font-semibold text-bad transition-colors hover:bg-[rgba(208,138,122,.2)]"
+                    onClick={() => void remove(s)}
+                    disabled={removing}
+                    className="rounded-[8px] border border-[rgba(208,138,122,.5)] bg-[rgba(208,138,122,.12)] px-3 py-1.5 text-[11.5px] font-semibold text-bad transition-colors hover:bg-[rgba(208,138,122,.2)] disabled:opacity-60"
                   >
-                    Remove
+                    {removing ? 'Removing…' : 'Remove'}
                   </button>
                   <button
                     onClick={() => setConfirmId(null)}
-                    className="px-2 py-1.5 text-[11.5px] text-muted transition-colors hover:text-ivory"
+                    disabled={removing}
+                    className="px-2 py-1.5 text-[11.5px] text-muted transition-colors hover:text-ivory disabled:opacity-60"
                   >
                     Cancel
                   </button>
@@ -113,7 +119,9 @@ export default function Sessions() {
 
         {sessions.length === 0 && (
           <div className="panel col-span-full p-10 text-center text-[13px] text-muted">
-            No sessions on the calendar. Prospects cannot book until one is added.
+            {loading
+              ? 'Reading the calendar…'
+              : 'No sessions on the calendar. Prospects cannot book until one is added.'}
           </div>
         )}
       </div>
@@ -141,17 +149,28 @@ function AddSession({ onDone }: { onDone: () => void }) {
     place: 'Zoom',
     note: '',
   })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const set = (k: keyof SessionInput) => (v: string) => setF((s) => ({ ...s, [k]: v }))
   const ready = f.dateIso !== '' && f.time !== ''
 
   return (
     <form
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault()
-        if (!ready) return
-        const made = createSession(f)
+        if (!ready || saving) return
+        setSaving(true)
+        setError(null)
+        const res = await createSession(f)
+        if (!res.ok) {
+          // The form stays open with what they typed — retyping a session
+          // because the save failed is worse than the failure.
+          setSaving(false)
+          setError(res.error)
+          return
+        }
         onDone()
-        notify(`${made.type} on ${made.date} published`, 'good')
+        notify(`${res.session.type} on ${res.session.date} published`, 'good')
       }}
       className="bevel mb-[22px] p-4 sm:p-[22px]"
     >
@@ -189,14 +208,21 @@ function AddSession({ onDone }: { onDone: () => void }) {
         />
       </div>
 
+      {error && <p className="mt-4 text-[12px] leading-relaxed text-bad">{error}</p>}
+
       <div className="mt-5 flex gap-2.5">
-        <button type="submit" disabled={!ready} className="btn-gold px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-40">
-          Publish session
+        <button
+          type="submit"
+          disabled={!ready || saving}
+          className="btn-gold px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {saving ? 'Publishing…' : 'Publish session'}
         </button>
         <button
           type="button"
           onClick={onDone}
-          className="rounded-[9px] border border-[rgba(212,175,55,.16)] px-4 py-2.5 text-[12px] text-muted transition-colors hover:text-ivory"
+          disabled={saving}
+          className="rounded-[9px] border border-[rgba(212,175,55,.16)] px-4 py-2.5 text-[12px] text-muted transition-colors hover:text-ivory disabled:opacity-40"
         >
           Cancel
         </button>

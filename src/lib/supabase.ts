@@ -132,6 +132,97 @@ export function formatSessionDate(iso: string) {
   })}`
 }
 
+/* ── The calendar ────────────────────────────────────────── */
+
+export interface SessionRow {
+  id: string
+  kind: string
+  dateOn: string
+  timeLabel: string
+  note: string
+  /** How many prospects are booked on it. */
+  registered: number
+}
+
+const SESSION_COLUMNS = 'id,kind,date_on,time_label,note'
+
+const toSessionRow = (r: Record<string, unknown>, registered = 0): SessionRow => ({
+  id: String(r.id),
+  kind: String(r.kind),
+  dateOn: String(r.date_on),
+  timeLabel: String(r.time_label),
+  note: String(r.note ?? ''),
+  registered,
+})
+
+/**
+ * The whole calendar, past dates included, with a head count per session.
+ *
+ * Everyone signed in may read it — one calendar serves every office — but only
+ * an admin may change it, per the `sessions_write` policy.
+ */
+export async function fetchSessions(): Promise<SessionRow[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase.from('sessions').select(SESSION_COLUMNS).order('date_on')
+  if (error) {
+    console.error('fetchSessions', error.message)
+    return []
+  }
+
+  // Postgres would have to group this behind an RPC; the roster is small enough
+  // to tally here, and RLS has already narrowed what comes back.
+  const counts = new Map<string, number>()
+  const { data: booked } = await supabase.from('prospects').select('session_id')
+  for (const r of (booked ?? []) as { session_id: string | null }[]) {
+    if (r.session_id) counts.set(r.session_id, (counts.get(r.session_id) ?? 0) + 1)
+  }
+
+  return (data ?? []).map((r) => toSessionRow(r, counts.get(String(r.id)) ?? 0))
+}
+
+export async function insertSession(input: {
+  kind: string
+  dateOn: string
+  timeLabel: string
+  note: string
+}): Promise<{ ok: true; row: SessionRow } | { ok: false; error: string }> {
+  if (!supabase) return { ok: false, error: 'Supabase is not configured for this site.' }
+  const { data, error } = await supabase
+    .from('sessions')
+    .insert({
+      kind: input.kind,
+      date_on: input.dateOn,
+      time_label: input.timeLabel,
+      note: input.note,
+    })
+    .select(SESSION_COLUMNS)
+    .single()
+  if (error) {
+    console.error('insertSession', error.message)
+    return { ok: false, error: error.message }
+  }
+  return { ok: true, row: toSessionRow(data) }
+}
+
+/**
+ * Take a session off the calendar.
+ *
+ * `prospects.session_id` is ON DELETE SET NULL, so anyone booked on it keeps
+ * their place in the pipeline but loses their date. The console says so before
+ * it asks — this is not a change that can be quietly undone.
+ */
+export async function deleteSession(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!supabase) return { ok: false, error: 'Supabase is not configured for this site.' }
+  const { error } = await supabase.from('sessions').delete().eq('id', id)
+  if (error) {
+    console.error('deleteSession', error.message)
+    return { ok: false, error: error.message }
+  }
+  return { ok: true }
+}
+
 /* ── Prospects ───────────────────────────────────────────── */
 
 /**
