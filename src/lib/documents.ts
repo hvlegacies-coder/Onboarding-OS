@@ -388,7 +388,15 @@ export function deriveDocumentFields(args: {
   const s = args.stored
   const str = (k: string) => (typeof s[k] === 'string' ? (s[k] as string) : '')
 
-  const iso = str('agreement_date') || new Date().toISOString().slice(0, 10)
+  /*
+   * Today, always — never the office's stored `agreement_date`.
+   *
+   * That stored value is whenever the owner filled in their setup form. Read
+   * as the agreement date it would freeze every contract that office ever
+   * sends to that one day: one office's setup is dated 4 August, so a contract
+   * raised in December would still say the parties agreed in August.
+   */
+  const iso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
   const d = new Date(`${iso}T00:00:00`)
   const month = d.toLocaleString('en-US', { month: 'long' })
   const yy = String(d.getFullYear()).slice(2)
