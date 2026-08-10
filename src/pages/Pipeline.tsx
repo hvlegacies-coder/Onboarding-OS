@@ -97,11 +97,17 @@ export default function Pipeline() {
             <div
               // Phones scroll the board with readable fixed columns; from lg it
               // divides the screen so the whole funnel is visible at once.
-              className={`stage-col w-[210px] flex-none rounded-2xl border border-[rgba(212,175,55,.16)] bg-gradient-to-b from-[rgba(28,28,33,.6)] to-[rgba(19,19,22,.6)] p-3 lg:w-auto lg:min-w-0 lg:flex-1 lg:basis-0 ${
+              //
+              // Height is capped at roughly the rest of the viewport: a stage
+              // holding 58 people would otherwise run metres down the page and
+              // leave every other column as empty space beside it. The count in
+              // the header is what states the size — the cards only have to show
+              // who is in there.
+              className={`stage-col flex max-h-[calc(100vh-270px)] min-h-[190px] w-[210px] flex-none flex-col rounded-2xl border border-[rgba(212,175,55,.16)] bg-gradient-to-b from-[rgba(28,28,33,.6)] to-[rgba(19,19,22,.6)] p-3 lg:w-auto lg:min-w-0 lg:flex-1 lg:basis-0 ${
                 col.danger ? 'stage-col--danger' : ''
               }`}
             >
-              <div className="mb-3 flex items-center justify-between gap-1.5">
+              <div className="mb-3 flex flex-none items-center justify-between gap-1.5">
                 <span className="min-w-0 truncate text-[11px] font-semibold text-champagne" title={col.title}>
                   {col.title}
                 </span>
@@ -110,15 +116,19 @@ export default function Pipeline() {
                 </span>
               </div>
 
-              {cards.map((p) => (
-                <Card key={p.id} p={p} danger={col.danger} onOpen={() => setOpenId(p.id)} />
-              ))}
+              {/* min-h-0 is what lets this shrink inside the flex column — without
+                  it the list keeps its full content height and scrolls nothing. */}
+              <div className="stage-scroll min-h-0 flex-1 overflow-y-auto pr-1">
+                {cards.map((p) => (
+                  <Card key={p.id} p={p} danger={col.danger} onOpen={() => setOpenId(p.id)} />
+                ))}
 
-              {cards.length === 0 && (
-                <div className="rounded-[11px] border border-dashed border-[rgba(212,175,55,.1)] py-5 text-center text-[11px] text-muted">
-                  Empty
-                </div>
-              )}
+                {cards.length === 0 && (
+                  <div className="rounded-[11px] border border-dashed border-[rgba(212,175,55,.1)] py-5 text-center text-[11px] text-muted">
+                    Empty
+                  </div>
+                )}
+              </div>
             </div>
               </Fragment>
             )
