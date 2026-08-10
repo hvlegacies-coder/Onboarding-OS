@@ -67,7 +67,7 @@ export default function OwnerContract() {
       {tab === 'customize' ? (
         <Customize office={office} templates={store.templates} />
       ) : (
-        <SentDocuments officeId={office.id} />
+        <SentDocuments office={office} />
       )}
     </>
   )

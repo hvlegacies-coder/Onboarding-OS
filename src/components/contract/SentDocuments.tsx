@@ -1,18 +1,17 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Check, Copy, ExternalLink, Send, TriangleAlert, UserPlus } from 'lucide-react'
 import Chip from '../ui/Chip'
-import { officeById } from '../../data/mock'
+import type { Office } from '../../lib/supabase'
 import {
   contractDetails,
-  createSend,
-  missingOfficeDetails,
+  missingIn,
   officeBranding,
-  sendsForOffice,
   signUrl,
   useContracts,
 } from '../../lib/contractStore'
+import { fetchDocuments, fetchOwnerContract, raiseDocument } from '../../lib/documents'
 import { ghlContractConfigured, sendContract } from '../../lib/ghl'
-import type { ContractSend, SendStatus } from '../../types'
+import type { ContractDetails, ContractSend, SendStatus } from '../../types'
 
 const STATUS: Record<SendStatus, { label: string; tone: 'good' | 'gold' | 'warn' | 'bad' }> = {
   sent: { label: 'Sent', tone: 'gold' },
@@ -21,11 +20,23 @@ const STATUS: Record<SendStatus, { label: string; tone: 'good' | 'gold' | 'warn'
   declined: { label: 'Declined', tone: 'bad' },
 }
 
-export default function SentDocuments({ officeId }: { officeId: string }) {
+/**
+ * The office is passed in whole rather than looked up by id. The prototype's
+ * `mock.ts` index is keyed by slug — real offices carry a Supabase UUID, so
+ * that lookup found nothing and this screen crashed on the office's name for
+ * every tenant that has actually been migrated.
+ */
+export default function SentDocuments({ office }: { office: Office }) {
   const store = useContracts()
-  const office = officeById(officeId)!
-  const sends = sendsForOffice(officeId)
+  const [sends, setSends] = useState<ContractSend[]>([])
   const [open, setOpen] = useState(false)
+
+  // Documents come from the database, so this list is the same on every device
+  // — it used to read localStorage and showed only what this browser had sent.
+  const reload = useCallback(() => {
+    void fetchDocuments().then((all) => setSends(all.filter((s) => s.officeId === office.id)))
+  }, [office.id])
+  useEffect(reload, [reload])
 
   return (
     <div className="grid items-start gap-5 lg:grid-cols-[380px_1fr]">
@@ -36,7 +47,12 @@ export default function SentDocuments({ officeId }: { officeId: string }) {
         </p>
 
         {open ? (
-          <SendForm officeId={officeId} templates={store.templates} onClose={() => setOpen(false)} />
+          <SendForm
+            office={office}
+            templates={store.templates}
+            onClose={() => setOpen(false)}
+            onSent={reload}
+          />
         ) : (
           <button
             onClick={() => setOpen(true)}
@@ -69,27 +85,38 @@ export default function SentDocuments({ officeId }: { officeId: string }) {
 }
 
 function SendForm({
-  officeId,
+  office,
   templates,
   onClose,
+  onSent,
 }: {
-  officeId: string
+  office: Office
   templates: ReturnType<typeof useContracts>['templates']
   onClose: () => void
+  onSent: () => void
 }) {
-  const office = officeById(officeId)!
+  const officeId = office.id
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? '')
   const [f, setF] = useState({ name: '', email: '', phone: '' })
   const [state, setState] = useState<'idle' | 'sending' | 'error'>('idle')
   const [detail, setDetail] = useState('')
+  const [saved, setSaved] = useState<ContractDetails | null>(null)
+
+  // The office's answers live in `owner_contracts`. The localStorage copy is
+  // only a fallback for a browser that filled them in before they were stored
+  // centrally — otherwise an owner's setup was invisible to everyone else.
+  useEffect(() => {
+    void fetchOwnerContract(officeId).then((c) => c && setSaved(c.details))
+  }, [officeId])
 
   const template = templates.find((t) => t.id === templateId)
-  const details = template ? contractDetails(officeId, template.id) : null
+  const details = saved ?? (template ? contractDetails(officeId, template.id) : null)
   const branding = officeBranding(officeId)
+  const businessName = branding.businessName || office.name
 
   // Having the agreement assigned isn't the same as being able to send it —
   // the office's own blanks have to be filled in first.
-  const missing = template ? missingOfficeDetails(officeId, template.id) : []
+  const missing = details ? missingIn(details, businessName) : []
   const ready =
     f.name.trim() !== '' &&
     (f.email.trim() !== '' || f.phone.trim() !== '') &&
@@ -105,25 +132,25 @@ function SendForm({
     // Everything below runs while the button reads "Sending…". If any of it
     // throws and we don't catch it, the button is stranded there with no error
     // and no way back — so the whole body is guarded.
-    let send: ReturnType<typeof createSend>
-    try {
-      // Create the document first — the link has to exist before we announce it.
-      send = createSend({
-        officeId,
-        officeName: branding.businessName || office.name,
-        ownerName: office.owner,
-        template,
-        details,
-        logo: branding.logo,
-        prospect: { name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim() },
-      })
-    } catch (err) {
+    // Create the document first — the link has to exist before we announce it.
+    // It is written to the database, so the token resolves on the recipient's
+    // device rather than only on this one.
+    const raised = await raiseDocument({
+      officeId,
+      officeName: businessName,
+      ownerName: office.ownerName,
+      logo: branding.logo || office.logoUrl || undefined,
+      template,
+      details,
+      prospect: { name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim() },
+    })
+    if (!raised.ok) {
       setState('error')
-      setDetail(
-        `The document couldn't be created (${err instanceof Error ? err.message : String(err)}). Nothing was sent.`,
-      )
+      setDetail(`The document couldn't be created (${raised.error}). Nothing was sent.`)
       return
     }
+    const send = raised.send
+    onSent()
 
     let res: Awaited<ReturnType<typeof sendContract>>
     try {
@@ -136,7 +163,7 @@ function SendForm({
         signLink: signUrl(send.token),
         contractName: template.name,
         contractVersion: template.version,
-        sentBy: office.owner,
+        sentBy: office.ownerName,
       })
     } catch (err) {
       setState('error')

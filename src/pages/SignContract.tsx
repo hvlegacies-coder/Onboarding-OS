@@ -6,40 +6,53 @@ import SignatureInput, { type SignatureDraft } from '../components/contract/Sign
 import FillGuide from '../components/contract/FillGuide'
 import Logo from '../components/ui/Logo'
 import {
-  declineSend,
   effectiveDetails,
-  getSend,
-  markViewed,
   mergeFields,
   missingRequired,
-  signSend,
   signUrl,
-  useContracts,
 } from '../lib/contractStore'
-import { findByEmail, setStage } from '../lib/prospectStore'
+import { declineDocument, fetchDocumentByToken, signDocument } from '../lib/documents'
 import { sendSigned } from '../lib/ghl'
-import type { Signature } from '../types'
+import type { ContractSend, Signature } from '../types'
 
 /**
  * The prospect's copy of their contract. Public — the token in the URL is the
- * only credential, so it is generated with crypto randomness and never listed.
+ * only credential, so the database mints it and it is never listed.
+ *
+ * The document is read from the database, not from this browser's storage. It
+ * used to come from localStorage, which meant the link only ever resolved on
+ * the machine that created it: everyone who was actually sent one saw "Link not
+ * valid". Fetching it by token is what makes a signing link work anywhere.
  */
 export default function SignContract() {
   const { token } = useParams()
-  useContracts() // re-render when the store changes
-  const send = getSend(token)
+  const [send, setSend] = useState<ContractSend | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const [name, setName] = useState('')
   const [signerValues, setSignerValues] = useState<Record<string, string>>({})
   const [draft, setDraft] = useState<SignatureDraft | null>(null)
   const [agreed, setAgreed] = useState(false)
   const [declining, setDeclining] = useState(false)
+  /** True while the signature or decline is in flight, so it can't double-fire. */
+  const [signing, setSigning] = useState(false)
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const contractRef = useRef<HTMLDivElement>(null)
 
+  // `get_document` stamps first_accessed_at and flips pending → viewed, so
+  // simply opening the link is what records that they opened it.
   useEffect(() => {
-    if (token) markViewed(token)
+    let cancelled = false
+    setLoading(true)
+    void fetchDocumentByToken(token ?? '').then((doc) => {
+      if (cancelled) return
+      setSend(doc)
+      setLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [token])
 
   /*
@@ -52,12 +65,11 @@ export default function SignContract() {
   const wantsCopy = new URLSearchParams(useLocation().search).get('copy') === 'signed'
   useEffect(() => {
     if (!wantsCopy || printed.current) return
-    const s = getSend(token)
-    if (s?.status !== 'signed') return
+    if (send?.status !== 'signed') return
     printed.current = true
     const id = setTimeout(() => window.print(), 700)
     return () => clearTimeout(id)
-  }, [wantsCopy, token])
+  }, [wantsCopy, send?.status])
 
   useEffect(() => {
     if (send && !name) setName(send.prospect.name)
@@ -73,6 +85,14 @@ export default function SignContract() {
       }).format(new Date()),
     [],
   )
+
+  if (loading) {
+    return (
+      <div className="grid min-h-screen place-items-center">
+        <span className="text-[13px] text-muted">Opening your agreement…</span>
+      </div>
+    )
+  }
 
   if (!send) {
     return (
@@ -108,7 +128,7 @@ export default function SignContract() {
     first?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
-  const submit = () => {
+  const submit = async () => {
     if (missing.length > 0) {
       flagMissing()
       setError(`Still needed: ${missing.map(humanize).join(', ')}.`)
@@ -118,7 +138,7 @@ export default function SignContract() {
       setError('Add your signature and agree to the terms to sign.')
       return
     }
-    if (!token) return
+    if (!token || !send || signing) return
 
     const signature: Signature = {
       name: name.trim(),
@@ -127,11 +147,21 @@ export default function SignContract() {
       font: draft!.font,
       signedAt: today,
     }
-    signSend(token, signature, signerValues)
 
-    // Move them along the pipeline so both dashboards reflect the signature.
-    const person = findByEmail(send.prospect.email)
-    if (person) setStage(person.id, 'signed')
+    // The database is what makes this real, so nothing is claimed until it
+    // answers. A signature reported as saved and then lost would be the worst
+    // failure this page could have.
+    setSigning(true)
+    const res = await signDocument(send, signature, signerValues)
+    setSigning(false)
+    if (!res.ok) {
+      setError(`Your signature couldn't be saved — ${res.error}. Nothing was submitted.`)
+      return
+    }
+
+    // Their pipeline stage moves inside `sign_document`: the signer is
+    // anonymous and RLS will not let them update their own prospect record.
+    setSend({ ...send, status: 'signed', signature, signerValues, signedAt: today })
 
     // Tell GHL it's executed, with a link to the signed copy. Not awaited: the
     // signature is already recorded, so a slow webhook must not hold up the
@@ -144,6 +174,18 @@ export default function SignContract() {
     })
 
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const decline = async () => {
+    if (!token || !send || signing) return
+    setSigning(true)
+    const res = await declineDocument(token, reason.trim())
+    setSigning(false)
+    if (!res.ok) {
+      setError(`That couldn't be recorded — ${res.error}.`)
+      return
+    }
+    setSend({ ...send, status: 'declined', declineReason: reason.trim() })
   }
 
   if (send.status === 'declined') {
@@ -313,7 +355,8 @@ export default function SignContract() {
             />
             <div className="mt-3 flex gap-2">
               <button
-                onClick={() => token && declineSend(token, reason.trim())}
+                onClick={() => void decline()}
+                disabled={signing}
                 className="rounded-[9px] border border-[rgba(208,138,122,.4)] px-4 py-2 text-[12px] font-semibold text-bad transition-colors hover:bg-[rgba(208,138,122,.08)]"
               >
                 Confirm decline

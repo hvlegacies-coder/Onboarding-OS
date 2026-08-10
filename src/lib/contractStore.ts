@@ -266,11 +266,18 @@ const OFFICE_REQUIRED: [
   ['governingState', 'Governing state'],
 ]
 
-export function missingOfficeDetails(officeId: string, templateId: string): string[] {
-  const d = contractDetails(officeId, templateId)
+/**
+ * The same check against details held anywhere — the office's saved answers now
+ * come from `owner_contracts`, not only from this browser.
+ */
+export function missingIn(d: ContractDetails, businessName: string): string[] {
   const missing = OFFICE_REQUIRED.filter(([k]) => !d[k].trim()).map(([, label]) => label)
-  if (!officeBranding(officeId).businessName.trim()) missing.unshift('Business name')
+  if (!businessName.trim()) missing.unshift('Business name')
   return missing
+}
+
+export function missingOfficeDetails(officeId: string, templateId: string): string[] {
+  return missingIn(contractDetails(officeId, templateId), officeBranding(officeId).businessName)
 }
 
 export function saveDetails(officeId: string, templateId: string, details: ContractDetails) {
