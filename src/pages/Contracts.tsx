@@ -9,6 +9,7 @@ import { offices } from '../data/mock'
 import { preparerById, useProspects } from '../lib/prospectStore'
 import { DOC_LABEL, docStatus, statusOf } from '../lib/contractStore'
 import { useDocuments } from '../lib/documents'
+import BatchSend from '../components/contract/BatchSend'
 import type { Preparer, Stage } from '../types'
 
 /** What happens next for someone at this stage, in plain language. */
@@ -47,6 +48,8 @@ export default function Contracts() {
         The correct branded agreement sends ~45 minutes after each Discovery Session. Two reminders, then automation
         stops and the owner takes over.
       </PageHead>
+
+      <BatchSend />
 
       <div className="mb-[26px] grid grid-cols-2 gap-3 sm:gap-[18px] lg:grid-cols-4">
         <KpiCard label="Sent" value={sent} sub="All time" />
@@ -93,7 +96,16 @@ export default function Contracts() {
 }
 
 function Row({ p, onOpen }: { p: Preparer; onOpen: () => void }) {
-  const next = NEXT[p.stage]
+  // Keyed off the contract status, not the raw stage: telling someone who has
+  // already signed that "reminders are scheduled before the session" is worse
+  // than saying nothing.
+  const status = statusOf(p)
+  const next =
+    status === 'signed'
+      ? NEXT.signed
+      : status === 'stalled'
+        ? NEXT.followup
+        : NEXT[p.stage]
   const doc = DOC_LABEL[docStatus(p.email)]
   // An office with incomplete branding can't send a correct contract (R4).
   const office = offices.find((o) => o.id === p.officeId)

@@ -240,7 +240,7 @@ export async function fetchProspects(): Promise<{
   const { data, error } = await supabase
     .from('prospects')
     .select(
-      'id,name,email,phone,stage,invited_on,signed_on,referred_by,owner_id,' +
+      'id,name,email,phone,stage,invited_on,signed_on,referred_by,owner_id,session_id,' +
         'owners(name,company_name),sessions(date_on,time_label)',
     )
     .order('created_at', { ascending: false })
@@ -267,6 +267,7 @@ export async function fetchProspects(): Promise<{
       office: String(office?.company_name || office?.name || 'Unknown office'),
       stage: r.stage as Stage,
       session: session ? `${formatSessionDate(session.date_on)} · ${session.time_label}` : '—',
+      sessionId: r.session_id ? String(r.session_id) : undefined,
       invited: shortDate(String(r.invited_on)),
       referredBy: (r.referred_by as string) || undefined,
       signedOn: r.signed_on ? shortDate(String(r.signed_on)) : undefined,
@@ -305,6 +306,7 @@ interface ProspectRow {
   signed_on: string | null
   referred_by: string | null
   owner_id: string
+  session_id: string | null
   owners: { name: string | null; company_name: string | null } | null
   sessions: { date_on: string; time_label: string } | null
 }

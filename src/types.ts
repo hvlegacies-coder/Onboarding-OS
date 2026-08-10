@@ -41,6 +41,8 @@ export interface Preparer {
   office: string
   stage: Stage
   session: string
+  /** Which session they booked, for acting on a whole cohort at once. */
+  sessionId?: string
   invited: string
   /** Optional free text from the invitation form. */
   referredBy?: string

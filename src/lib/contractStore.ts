@@ -5,6 +5,7 @@ import { offices, preparers as seedPreparers } from '../data/mock'
 import { contractStatus } from './contract'
 import type {
   SendStatus,
+  ContractStatus,
   ContractDetails,
   ContractSend,
   ContractTemplate,
@@ -400,8 +401,20 @@ export const hasSendTo = (email: string) => Boolean(latestSendTo(email))
  * rather than after the session. Every view reads through this so the console
  * can't report "not sent yet" for a contract already in someone's inbox.
  */
-export const statusOf = (p: { stage: Stage; email: string }) =>
-  contractStatus(p.stage, hasSendTo(p.email))
+export const statusOf = (p: { stage: Stage; email: string }): ContractStatus => {
+  /*
+   * The document is the authority on whether it has been signed.
+   *
+   * Reading this from the pipeline stage alone reported "Signed 0" on a page
+   * showing three signed agreements: those were signed in the contract
+   * platform, which never touched anyone's stage here. Where the two disagree
+   * about an executed document, the document wins.
+   */
+  const doc = docStatus(p.email)
+  if (doc === 'signed') return 'signed'
+  if (doc === 'declined') return 'stalled'
+  return contractStatus(p.stage, doc !== 'none')
+}
 
 /* ── Document state ──────────────────────────────────────── */
 
