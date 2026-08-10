@@ -338,7 +338,20 @@ export async function fetchDocuments(): Promise<ContractSend[]> {
  */
 export async function fetchDocumentByToken(token: string): Promise<ContractSend | null> {
   if (!supabase || !token) return null
-  const { data, error } = await supabase.rpc('get_document', { p_token: token })
+
+  /*
+   * Pull the UUID out of whatever arrived.
+   *
+   * A signing link travels through email and SMS, and both mangle it: a mail
+   * client that autolinks "…480516." swallows the sentence's full stop into
+   * the href, a copy-paste picks up a trailing bracket or a newline. Any of
+   * those fails the uuid cast, and the page then tells someone holding a
+   * perfectly good link that it is invalid.
+   */
+  const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.exec(token)?.[0]
+  if (!uuid) return null
+
+  const { data, error } = await supabase.rpc('get_document', { p_token: uuid })
   if (error) {
     console.error('fetchDocumentByToken', error.message)
     return null
