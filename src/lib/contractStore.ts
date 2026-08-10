@@ -571,7 +571,23 @@ export function mergeKeys(template: ContractTemplate): string[] {
   return [...keys]
 }
 
-/** Required blanks the signer still has to complete before they can sign. */
+/**
+ * The only blanks the contractor is ever asked to complete — their own.
+ *
+ * Everything else on the page belongs to the office.
+ */
+export const SIGNER_FIELDS = ['preparer_name', 'preparer_address', 'preparer_city']
+
+/**
+ * Required blanks the signer still has to complete before they can sign.
+ *
+ * Scoped to the signer's own fields. It used to require every blank in the
+ * document, so an office that had not filled in its own details locked the
+ * contractor out of signing: they were told "still needed: notice contact" for
+ * a field only the office can edit, with nothing on the page to fill. An
+ * office blank is the office's to complete, before or after signature — it is
+ * never the contractor's problem.
+ */
 export function missingRequired(
   template: ContractTemplate,
   merged: Record<string, string>,
@@ -580,6 +596,7 @@ export function missingRequired(
   const optional = template.optionalFields ?? []
   return mergeKeys(template).filter(
     (k) =>
+      SIGNER_FIELDS.includes(k) &&
       !optional.includes(k) &&
       !merged[k]?.trim() &&
       !signerValues[k]?.trim(),

@@ -190,7 +190,7 @@ export function toSend(r: DocumentRow): ContractSend {
     // documents raised before snapshots existed.
     template: snap.template ?? ICA_TEMPLATE,
     details: readDetails(snap.details ?? form),
-    logo: snap.office?.logo,
+    logo: snap.office?.logo || asText(form.company_logo) || undefined,
     prospect: {
       name: r.recipient_name || asText(form.contractor_name) || snap.prospect?.name || '',
       email: r.recipient_email ?? snap.prospect?.email ?? '',
@@ -276,6 +276,12 @@ export function deriveDocumentFields(args: {
   stored: Record<string, unknown>
   /** The office's name. This, not the stored value, is the business name. */
   officeName: string
+  /**
+   * The office's logo, snapshotted in. The signing page is anonymous and
+   * cannot read `owners`, so a logo that stays there never reaches the person
+   * signing. Empty means no logo, and no logo means none is drawn.
+   */
+  logo?: string
   /** `owners.owner_name` — the only source for the notices "attn" line. */
   ownerName: string
   prospect: { name: string }
@@ -334,6 +340,7 @@ export function deriveDocumentFields(args: {
     sig_contractor_title: 'Independent Contractor',
     sig_contractor_date: '',
     owner_signature: str('owner_signature'),
+    company_logo: args.logo ?? '',
   }
 }
 
