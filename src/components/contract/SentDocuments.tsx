@@ -117,11 +117,11 @@ function SendForm({
   // Having the agreement assigned isn't the same as being able to send it —
   // the office's own blanks have to be filled in first.
   const missing = details ? missingIn(details, businessName) : []
+  // Missing office details no longer block a send. Getting the agreement in
+  // front of the prospect is what matters; the office completes the rest after
+  // signature. The warning below still says what is unfilled.
   const ready =
-    f.name.trim() !== '' &&
-    (f.email.trim() !== '' || f.phone.trim() !== '') &&
-    Boolean(template) &&
-    missing.length === 0
+    f.name.trim() !== '' && (f.email.trim() !== '' || f.phone.trim() !== '') && Boolean(template)
   const unsigned = details && !details.signature
 
   const submit = async (e: React.FormEvent) => {
@@ -210,9 +210,10 @@ function SendForm({
       <Field label="Phone" value={f.phone} onChange={(v) => setF({ ...f, phone: v })} type="tel" autoComplete="tel" />
 
       {missing.length > 0 && (
-        <p className="flex gap-2 text-[11.5px] leading-relaxed text-bad">
+        <p className="flex gap-2 text-[11.5px] leading-relaxed text-warn">
           <TriangleAlert size={14} className="mt-px flex-none" />
-          Fill in your contract details before sending — still missing: {missing.join(', ')}.
+          These are still blank and will send blank: {missing.join(', ')}. You can complete them
+          on the agreement after it is signed.
         </p>
       )}
 

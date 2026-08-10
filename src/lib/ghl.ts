@@ -18,8 +18,15 @@ export interface InvitePayload {
   notes: string
 }
 
-/** A contract going out for signature. GHL sends the email and text. */
+/**
+ * A contract going out for signature. GHL sends the email and text.
+ *
+ * The field names crossing the wire are the workflow's, not this codebase's —
+ * see `sendContract`. They are capitalised and spaced because that is what the
+ * GoHighLevel side maps on, and a rename here silently empties a field there.
+ */
 export interface ContractPayload {
+  /** The office doing the inviting — drives branding and owner notifications. */
   officeName: string
   officeId: string
   /** Who is signing. */
@@ -155,5 +162,27 @@ export const sendInvite = (payload: InvitePayload) =>
 export const sendRegistration = (payload: RegistrationPayload) =>
   post(REGISTRATION_WEBHOOK, { event: 'registration', ...payload })
 
+/**
+ * Hands a contract to GoHighLevel to deliver.
+ *
+ * The body is written in the workflow's own field names — `Name`, `Email`,
+ * `Phone`, `Contract link`, `Office name` — because those are what the GHL
+ * side maps on. The internal names stay on this side of the boundary, and the
+ * translation happens here, once, where it can be seen.
+ *
+ * `event` and `officeId` ride along as metadata so one webhook can serve
+ * several events and an owner notification can resolve its office.
+ */
 export const sendContract = (payload: ContractPayload) =>
-  post(CONTRACT_WEBHOOK, { event: 'contract', ...payload })
+  post(CONTRACT_WEBHOOK, {
+    event: 'contract',
+    Name: payload.name,
+    Email: payload.email,
+    Phone: payload.phone,
+    'Contract link': payload.signLink,
+    'Office name': payload.officeName,
+    officeId: payload.officeId,
+    sentBy: payload.sentBy,
+    contractName: payload.contractName,
+    contractVersion: payload.contractVersion,
+  })

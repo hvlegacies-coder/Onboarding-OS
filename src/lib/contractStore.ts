@@ -533,10 +533,11 @@ export function mergeFields(
   const d = details.agreementDate ? new Date(`${details.agreementDate}T00:00:00`) : null
   const month = d ? d.toLocaleString('en-US', { month: 'long' }) : ''
 
-  // The agreement runs to April 30 after the term elapses, so a 1-year term
-  // starting mid-season covers the following filing season in full.
+  // The agreement runs to April 30 in the year the term elapses. No extra year:
+  // an executed agreement dated 2026 with a two-year term expires April 30 2028,
+  // and this used to print 2029 — a year of term nobody agreed to.
   const years = parseInt(details.termLength, 10)
-  const expiry = d && !Number.isNaN(years) ? d.getFullYear() + years + 1 : null
+  const expiry = d && !Number.isNaN(years) ? d.getFullYear() + years : null
 
   return {
     ...details.values,

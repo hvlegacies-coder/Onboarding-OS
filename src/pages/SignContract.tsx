@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
-import { CheckCircle2, Download, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { CheckCircle2, ShieldCheck, TriangleAlert } from 'lucide-react'
 import ContractPaper, { humanize } from '../components/contract/ContractPaper'
 import SignatureInput, { type SignatureDraft } from '../components/contract/SignatureInput'
 import FillGuide from '../components/contract/FillGuide'
-import Logo from '../components/ui/Logo'
 import {
   effectiveDetails,
   mergeFields,
@@ -206,11 +205,10 @@ export default function SignContract() {
       <header className="no-print border-b border-[rgba(212,175,55,.16)] bg-[rgba(19,19,22,.7)]">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
-            {send.logo ? (
-              <img src={send.logo} alt="" className="h-9 w-9 object-contain" />
-            ) : (
-              <Logo size={34} interactive={false} />
-            )}
+            {/* No logo means no logo. Falling back to the Higher View mark put
+                the platform's brand on another office's agreement, which is
+                exactly what a white-label contract must not do (R3). */}
+            {send.logo && <img src={send.logo} alt="" className="h-9 w-9 object-contain" />}
             <span className="gold-text font-cinzel text-[15px] font-semibold">
               {send.officeName}
             </span>
@@ -233,20 +231,19 @@ export default function SignContract() {
         <div className="no-print mx-auto mt-6 max-w-3xl px-4">
           <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[rgba(212,175,55,.3)] bg-[rgba(212,175,55,.07)] px-5 py-4">
             <CheckCircle2 size={22} className="text-gold" />
+            {/* No download here on purpose: the signer is told their copy is
+                coming rather than being asked to save one themselves. The
+                office completes any remaining details after signature, so the
+                copy that matters is the one sent afterwards, not this view. */}
             <div className="min-w-0 flex-1">
               <p className="text-[13.5px] font-semibold text-ivory">
                 This agreement has been signed.
               </p>
               <p className="text-[12px] text-muted">
-                Signed by {send.signature?.name} on {send.signedAt}.
+                Signed by {send.signature?.name} on {send.signedAt}. A copy of the completed
+                agreement will be sent to you at {send.prospect.email || 'your email address'}.
               </p>
             </div>
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-1.5 rounded-[9px] border border-[rgba(212,175,55,.28)] px-3.5 py-2 text-[12px] font-semibold text-gold transition-colors hover:bg-[rgba(212,175,55,.08)]"
-            >
-              <Download size={14} /> Download PDF
-            </button>
           </div>
         </div>
       ) : (

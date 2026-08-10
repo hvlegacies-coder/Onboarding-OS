@@ -116,8 +116,9 @@ function readDetails(raw: unknown): ContractDetails {
     cityStateZip: pick('cityStateZip', 'city_state_zip', 'company_city'),
     governingState: pick('governingState', 'governing_state'),
     agreementDate: pick('agreementDate', 'agreement_date'),
-    // `term_years` is a bare number over there; this app wants "1 year".
-    termLength: pick('termLength', 'term_length') || termFrom(pick('term_years')) || base.termLength,
+    // The house term, on every agreement — the stored per-office `term_years`
+    // is deliberately not read, so no document can carry a different one.
+    termLength: `${TERM_YEARS} years`,
     values: (d.values && typeof d.values === 'object' ? d.values : {}) as Record<string, string>,
     // The countersignature is stored as a bare data URL, not as this app's
     // Signature object — `readSignature` handles both.
@@ -127,10 +128,6 @@ function readDetails(raw: unknown): ContractDetails {
 
 const asText = (v: unknown) => (typeof v === 'string' ? v : '')
 
-const termFrom = (years: string) => {
-  const n = parseInt(years, 10)
-  return Number.isNaN(n) ? '' : `${n} year${n === 1 ? '' : 's'}`
-}
 
 /**
  * `documents.signature` is a single text column. This app records more than a
@@ -187,7 +184,8 @@ export function toSend(r: DocumentRow): ContractSend {
     // and details sit flat in `form_data`. Falling back to that is what lets
     // this app read the agreements it did not itself send.
     officeName: snap.office?.name || asText(form.company_name),
-    ownerName: snap.office?.ownerName || asText(form.sig_company_by),
+    // Not `sig_company_by` — that column holds the signature image, not a name.
+    ownerName: snap.office?.ownerName || asText(form.notice_company_attn) || asText(form.sig_company_print),
     // The template is frozen at send time; the code copy is only a fallback for
     // documents raised before snapshots existed.
     template: snap.template ?? ICA_TEMPLATE,
@@ -251,6 +249,93 @@ export async function fetchDocumentByToken(token: string): Promise<ContractSend 
 }
 
 /* ── Raising one ─────────────────────────────────────────── */
+
+/* ── Field derivation ────────────────────────────────────── */
+
+/**
+ * The house term, on every agreement. Offices used to store their own
+ * `term_years` and it varied; one standard term is the decision, so the stored
+ * value is deliberately ignored rather than read as a default.
+ */
+export const TERM_YEARS = 3
+
+/**
+ * The full field set a generated document carries.
+ *
+ * An office stores six things — company name, address, city, governing state,
+ * a signature image and a term length. A real document carries thirty-two: the
+ * notices blocks, the signature blocks and the term dates are all *derived* at
+ * send time. This mirrors an executed agreement exactly, so a document raised
+ * here renders identically to one the contract platform produced.
+ *
+ * Contractor fields are deliberately left empty. They are filled at signing,
+ * by the contractor, and an unsigned agreement should show them blank.
+ */
+export function deriveDocumentFields(args: {
+  /** The office's stored answers, in the platform's own vocabulary. */
+  stored: Record<string, unknown>
+  /** The office's name. This, not the stored value, is the business name. */
+  officeName: string
+  /** `owners.owner_name` — the only source for the notices "attn" line. */
+  ownerName: string
+  prospect: { name: string }
+}): Record<string, string> {
+  const s = args.stored
+  const str = (k: string) => (typeof s[k] === 'string' ? (s[k] as string) : '')
+
+  const iso = str('agreement_date') || new Date().toISOString().slice(0, 10)
+  const d = new Date(`${iso}T00:00:00`)
+  const month = d.toLocaleString('en-US', { month: 'long' })
+  const yy = String(d.getFullYear()).slice(2)
+
+  // The business name is the office's name, always — not whatever happens to
+  // be sitting in the stored contract details, which in at least one office is
+  // an email address.
+  const company = args.officeName || str('company_name')
+  const place = str('company_place')
+  const city = str('company_city')
+
+  return {
+    intro_day: String(d.getDate()),
+    intro_month: month,
+    intro_year: yy,
+    company_name: company,
+    company_place: place,
+    company_city: city,
+    governing_state: str('governing_state'),
+    agreement_date: iso,
+    contractor_name: args.prospect.name,
+    contractor_place: '',
+    // Term
+    term_years: String(TERM_YEARS),
+    term_commence: `${month} ${d.getDate()}`,
+    term_commence_year: yy,
+    term_expire_year: String(d.getFullYear() + TERM_YEARS).slice(2),
+    // Notices — the company block restates the company fields; the attn line
+    // is the owner personally, which is why an office with no `owner_name`
+    // leaves it blank.
+    notice_company_entity: company,
+    notice_company_address: place,
+    notice_company_city: city,
+    notice_company_attn: args.ownerName,
+    notice_contractor_entity: args.prospect.name,
+    notice_contractor_address: '',
+    notice_contractor_city: '',
+    notice_contractor_attn: args.prospect.name,
+    // Execution
+    sig_company_org: company,
+    sig_company_by: str('owner_signature'),
+    sig_company_print: company,
+    sig_company_title: 'Owner',
+    sig_company_date: `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`,
+    sig_contractor_org: args.prospect.name,
+    sig_contractor_by: '',
+    sig_contractor_print: '',
+    sig_contractor_title: 'Independent Contractor',
+    sig_contractor_date: '',
+    owner_signature: str('owner_signature'),
+  }
+}
 
 export interface RaiseArgs {
   /** The inviting office. Never taken from prospect input (R2/R3). */
