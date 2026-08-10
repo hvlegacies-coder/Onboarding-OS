@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { Check, ExternalLink, Mail, Phone, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, ExternalLink, Mail, Phone, Trash2, X } from 'lucide-react'
 import Avatar from '../ui/Avatar'
 import Chip from '../ui/Chip'
 import StagePill from '../ui/StagePill'
@@ -14,7 +14,8 @@ import {
   signUrl,
   useContracts,
 } from '../../lib/contractStore'
-import { eventsFor, moveStage, useProspects } from '../../lib/prospectStore'
+import { eventsFor, moveStage, removePreparer, useProspects } from '../../lib/prospectStore'
+import { notify } from '../../lib/toast'
 import type { JourneyEntry } from '../../lib/journey'
 import type { Preparer } from '../../types'
 
@@ -22,8 +23,9 @@ import type { Preparer } from '../../types'
  * Everything the platform knows about one preparer, in one panel: where they
  * are, how they got there, what has been sent, and what can be done by hand.
  *
- * Read-only for the owner — only Higher View admins get the manual actions,
- * since a stage move overrides automation for everyone watching.
+ * Read-only for the owner — only Higher View admins get the manual actions and
+ * the removal, since a stage move overrides automation for everyone watching
+ * and a removal takes the contact out of the central account entirely.
  */
 export default function PreparerDrawer({
   preparer,
@@ -37,6 +39,10 @@ export default function PreparerDrawer({
   // Re-render when a manual action moves them, or a contract comes back signed.
   useProspects()
   useContracts()
+
+  const [confirming, setConfirming] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -59,6 +65,19 @@ export default function PreparerDrawer({
   const office = officeById(p.officeId)
   const events = eventsFor(p.id)
   const actions = canAct ? actionsFor(p) : []
+
+  const remove = async () => {
+    setRemoving(true)
+    setError(null)
+    const res = await removePreparer(p)
+    if (!res.ok) {
+      setRemoving(false)
+      setError(res.error)
+      return
+    }
+    notify(`${p.name} removed from ${p.office}`, 'bad')
+    onClose()
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -187,29 +206,80 @@ export default function PreparerDrawer({
           )}
         </div>
 
-        {actions.length > 0 && (
+        {canAct && (
           <footer className="border-t border-[rgba(212,175,55,.16)] p-5">
-            <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted">
-              Move them by hand
-            </div>
-            <div className="flex flex-wrap gap-2.5">
-              {actions.map((a) => (
-                <button
-                  key={a.stage}
-                  onClick={() => moveStage(p, a.stage, a.label)}
-                  className={
-                    a.danger
-                      ? 'rounded-[11px] border border-[rgba(208,138,122,.4)] px-3.5 py-2.5 text-[12px] font-semibold text-bad transition-colors hover:bg-[rgba(208,138,122,.1)]'
-                      : 'btn-gold px-3.5 py-2.5'
-                  }
-                >
-                  {a.label}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2.5 text-[11px] leading-relaxed text-muted">
-              A manual move overrides automation and is logged against this preparer.
-            </p>
+            {actions.length > 0 && (
+              <>
+                <div className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted">
+                  Move them by hand
+                </div>
+                <div className="flex flex-wrap gap-2.5">
+                  {actions.map((a) => (
+                    <button
+                      key={a.stage}
+                      onClick={() => moveStage(p, a.stage, a.label)}
+                      className={
+                        a.danger
+                          ? 'rounded-[11px] border border-[rgba(208,138,122,.4)] px-3.5 py-2.5 text-[12px] font-semibold text-bad transition-colors hover:bg-[rgba(208,138,122,.1)]'
+                          : 'btn-gold px-3.5 py-2.5'
+                      }
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2.5 text-[11px] leading-relaxed text-muted">
+                  A manual move overrides automation and is logged against this preparer.
+                </p>
+              </>
+            )}
+
+            {/* Removal is the one action here that cannot be taken back, so it
+                sits apart from the stage moves and states what it destroys
+                rather than asking "are you sure". */}
+            {confirming ? (
+              <div
+                className={`rounded-[11px] border border-[rgba(208,138,122,.35)] bg-[rgba(208,138,122,.06)] p-3.5 ${
+                  actions.length > 0 ? 'mt-4' : ''
+                }`}
+              >
+                <div className="text-[12.5px] font-semibold text-bad">Remove {p.name}?</div>
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted">
+                  They are deleted from the central account along with their journey history, and
+                  drop out of {p.office}'s pipeline. Any agreement already sent to them is kept.
+                  This cannot be undone.
+                </p>
+                {error && <p className="mt-2 text-[11.5px] leading-relaxed text-bad">{error}</p>}
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={remove}
+                    disabled={removing}
+                    className="rounded-[8px] border border-[rgba(208,138,122,.5)] bg-[rgba(208,138,122,.12)] px-3 py-1.5 text-[11.5px] font-semibold text-bad transition-colors hover:bg-[rgba(208,138,122,.2)] disabled:opacity-60"
+                  >
+                    {removing ? 'Removing…' : 'Remove preparer'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setConfirming(false)
+                      setError(null)
+                    }}
+                    disabled={removing}
+                    className="px-2 py-1.5 text-[11.5px] text-muted transition-colors hover:text-ivory disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirming(true)}
+                className={`inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-muted transition-colors hover:text-bad ${
+                  actions.length > 0 ? 'mt-4' : ''
+                }`}
+              >
+                <Trash2 size={12} /> Remove preparer
+              </button>
+            )}
           </footer>
         )}
       </aside>

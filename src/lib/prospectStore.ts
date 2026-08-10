@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { offices, preparers as seedPreparers } from '../data/mock'
 import {
+  deleteProspect,
   fetchProspects,
   insertProspectEvent,
   supabaseReady,
@@ -43,9 +44,14 @@ interface ProspectStore {
   stages: Record<string, Stage>
   /** Per-preparer history of manual actions, keyed by preparer id. */
   events: Record<string, PreparerEvent[]>
+  /**
+   * Ids taken off the roster. Seeded samples come back from `mock.ts` on every
+   * read, so this list is what keeps a removed one gone.
+   */
+  removed: string[]
 }
 
-const EMPTY: ProspectStore = { registered: [], activity: [], stages: {}, events: {} }
+const EMPTY: ProspectStore = { registered: [], activity: [], stages: {}, events: {}, removed: [] }
 
 function read(): ProspectStore {
   try {
@@ -56,6 +62,7 @@ function read(): ProspectStore {
     p.activity ??= []
     p.stages ??= {}
     p.events ??= {}
+    p.removed ??= []
     return p
   } catch {
     return EMPTY
@@ -119,13 +126,15 @@ export function hydrateProspects(): Promise<void> {
 /** Registrations first, then the seeded samples, with manual moves applied. */
 export function allPreparers(): Preparer[] {
   const base = live ? store.registered : [...store.registered, ...seedPreparers]
-  return base.map((p) => {
-    const moved = store.stages[p.id]
-    if (!moved || moved === p.stage) return p
-    // Signing is the only transition that stamps a date on the record.
-    const signedOn = p.signedOn ?? (SIGNED_STAGES.includes(moved) ? shortDate() : undefined)
-    return { ...p, stage: moved, signedOn }
-  })
+  return base
+    .filter((p) => !store.removed.includes(p.id))
+    .map((p) => {
+      const moved = store.stages[p.id]
+      if (!moved || moved === p.stage) return p
+      // Signing is the only transition that stamps a date on the record.
+      const signedOn = p.signedOn ?? (SIGNED_STAGES.includes(moved) ? shortDate() : undefined)
+      return { ...p, stage: moved, signedOn }
+    })
 }
 
 const SIGNED_STAGES: Stage[] = ['signed', 'orientation', 'onboarded']
@@ -263,6 +272,50 @@ export function moveStage(p: Preparer, stage: Stage, label: string) {
     meta: `${p.office} · just now`,
   }
   commit({ ...store, activity: [entry, ...store.activity].slice(0, 40) })
+}
+
+/* ── Removing ────────────────────────────────────────────── */
+
+/** Sample rows exist only in `mock.ts` — there is no record to delete. */
+const isSeed = (id: string) => seedPreparers.some((p) => p.id === id)
+
+/**
+ * Take someone off the roster for good.
+ *
+ * The database is asked first, unlike the stage moves above: an optimistic
+ * removal that quietly failed would leave an operator believing a contact was
+ * gone until the next reload brought them back — the one outcome a delete must
+ * never have. Their events cascade with them; anything already sent for
+ * signature is kept, since a signed agreement is not the pipeline's to erase.
+ */
+export async function removePreparer(
+  p: Preparer,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSeed(p.id)) {
+    const res = await deleteProspect(p.id)
+    if (!res.ok) return res
+  }
+
+  const stages = { ...store.stages }
+  const events = { ...store.events }
+  delete stages[p.id]
+  delete events[p.id]
+
+  const entry: Activity = {
+    id: `act-${p.id}-${Date.now().toString(36)}`,
+    tone: 'bad',
+    text: `<b>${p.name}</b> was removed from the account`,
+    meta: `${p.office} · just now`,
+  }
+
+  commit({
+    registered: store.registered.filter((x) => x.id !== p.id),
+    activity: [entry, ...store.activity].slice(0, 40),
+    stages,
+    events,
+    removed: [...store.removed, p.id],
+  })
+  return { ok: true }
 }
 
 /** Match a registered prospect by email, so signing can move the right person. */

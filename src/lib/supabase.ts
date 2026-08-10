@@ -244,6 +244,28 @@ export async function updateProspectStage(id: string, stage: Stage) {
   if (error) console.error('updateProspectStage', error.message)
 }
 
+/**
+ * Delete a prospect outright. Their events cascade with them.
+ *
+ * A document raised for them is deliberately left alone: `document_id` points
+ * from the prospect at the document, so nothing breaks, and a signed agreement
+ * is a record in its own right that outlives the pipeline row.
+ *
+ * RLS decides who may do this — an owner can only reach their own office's
+ * rows, whatever the UI happens to offer.
+ */
+export async function deleteProspect(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!supabase) return { ok: true }
+  const { error } = await supabase.from('prospects').delete().eq('id', id)
+  if (error) {
+    console.error('deleteProspect', error.message)
+    return { ok: false, error: error.message }
+  }
+  return { ok: true }
+}
+
 export async function insertProspectEvent(
   prospectId: string,
   body: string,
