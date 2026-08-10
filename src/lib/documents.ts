@@ -353,7 +353,10 @@ export function deriveDocumentFields(args: {
     sig_contractor_title: 'Independent Contractor',
     sig_contractor_date: '',
     owner_signature: '',
-    company_logo: args.logo ?? '',
+    // Held back with the rest. At this stage the agreement exists to collect
+    // the applicant's details and their signature; the branded, countersigned
+    // copy is what goes out afterwards. Restore with `args.logo ?? ''`.
+    company_logo: '',
   }
 }
 
