@@ -19,6 +19,9 @@ import type { Preparer } from '../../types'
  * Anyone who already has a document is skipped rather than sent a second one —
  * a duplicate agreement is not something you can take back.
  */
+/** Not a session — pick individuals from the whole roster instead. */
+const CUSTOM = '__custom__'
+
 export default function BatchSend() {
   const { sessions } = useSessions()
   const { preparers } = useProspects()
@@ -29,23 +32,52 @@ export default function BatchSend() {
   const [confirming, setConfirming] = useState(false)
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState<{ sent: number; failed: string[] } | null>(null)
+  /** Who is actually going, by preparer id. Everyone eligible, until changed. */
+  const [picked, setPicked] = useState<Set<string>>(new Set())
 
   const chosen = discovery.find((s) => s.id === sessionId)
 
-  /** Everyone on that session, split by whether they already have one. */
-  const { toSend, already } = useMemo(() => {
-    const booked = preparers.filter((p) => p.sessionId && p.sessionId === sessionId)
+  /**
+   * The pool to choose from: one session's bookings, or everyone still without
+   * an agreement. Either way, anyone who already has one is set aside rather
+   * than offered — a second contract is not something you can take back.
+   */
+  const { eligible, already } = useMemo(() => {
+    const pool =
+      sessionId === CUSTOM
+        ? preparers
+        : preparers.filter((p) => p.sessionId && p.sessionId === sessionId)
     const already: Preparer[] = []
-    const toSend: Preparer[] = []
-    for (const p of booked) (documentFor(p.email) ? already : toSend).push(p)
-    return { toSend, already }
+    const eligible: Preparer[] = []
+    for (const p of pool) (documentFor(p.email) ? already : eligible).push(p)
+    eligible.sort((a, b) => a.office.localeCompare(b.office) || a.name.localeCompare(b.name))
+    return { eligible, already }
   }, [preparers, sessionId])
+
+  const toSend = useMemo(() => eligible.filter((p) => picked.has(p.id)), [eligible, picked])
 
   const byOffice = useMemo(() => {
     const m = new Map<string, number>()
     for (const p of toSend) m.set(p.office, (m.get(p.office) ?? 0) + 1)
     return [...m.entries()].sort((a, b) => b[1] - a[1])
   }, [toSend])
+
+  /** Changing the source starts everyone selected — the common case is "all". */
+  const choose = (id: string) => {
+    setSessionId(id)
+    setConfirming(false)
+    setDone(null)
+    const pool =
+      id === CUSTOM ? preparers : preparers.filter((p) => p.sessionId && p.sessionId === id)
+    setPicked(new Set(pool.filter((p) => !documentFor(p.email)).map((p) => p.id)))
+  }
+
+  const toggle = (id: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
 
   const run = async () => {
     setRunning(true)
@@ -105,11 +137,7 @@ export default function BatchSend() {
           </span>
           <select
             value={sessionId}
-            onChange={(e) => {
-              setSessionId(e.target.value)
-              setConfirming(false)
-              setDone(null)
-            }}
+            onChange={(e) => choose(e.target.value)}
             className="w-full cursor-pointer rounded-[9px] border border-[rgba(212,175,55,.16)] bg-graphite px-3 py-2.5 text-[13px] text-ivory outline-none focus:border-[rgba(212,175,55,.5)]"
           >
             <option value="">Choose a Discovery Session…</option>
@@ -118,35 +146,85 @@ export default function BatchSend() {
                 {s.date} · {s.time}
               </option>
             ))}
+            <option value={CUSTOM}>Custom — pick people myself</option>
           </select>
         </label>
 
         <button
           onClick={() => setConfirming(true)}
-          disabled={!chosen || toSend.length === 0 || running}
+          disabled={toSend.length === 0 || running}
           className="btn-gold flex items-center gap-2 px-4 py-2.5 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Send size={14} strokeWidth={2.2} />
-          {chosen ? `Send to ${toSend.length}` : 'Send contracts'}
+          {sessionId ? `Send to ${toSend.length}` : 'Send contracts'}
         </button>
       </div>
 
-      {chosen && !confirming && !done && (
+      {sessionId && !confirming && !done && (
         <p className="mt-3 text-[12px] leading-relaxed text-muted">
-          {toSend.length} to send
+          {toSend.length} selected of {eligible.length}
           {already.length > 0 && (
-            <> · <b className="text-champagne">{already.length} already have a contract</b> and will be skipped</>
+            <> · <b className="text-champagne">{already.length} already have a contract</b> and aren't listed</>
           )}
-          {toSend.length === 0 && ' — nobody on this session is waiting for one.'}
+          {eligible.length === 0 && ' — nobody here is waiting for one.'}
         </p>
+      )}
+
+      {/* Everyone eligible, all ticked to begin with. Untick anyone who should
+          not receive one — that is the whole difference between "send to this
+          session" and "send to these people". */}
+      {sessionId && eligible.length > 0 && !done && (
+        <div className="mt-3 rounded-[11px] border border-[rgba(212,175,55,.12)]">
+          <div className="flex items-center justify-between gap-3 border-b border-[rgba(212,175,55,.1)] px-3.5 py-2">
+            <span className="text-[11px] uppercase tracking-[0.12em] text-muted">
+              {chosen ? chosen.date : 'Everyone without an agreement'}
+            </span>
+            <div className="flex gap-3 text-[11.5px]">
+              <button
+                onClick={() => setPicked(new Set(eligible.map((p) => p.id)))}
+                className="text-gold transition-colors hover:text-champagne"
+              >
+                Select all
+              </button>
+              <button
+                onClick={() => setPicked(new Set())}
+                className="text-muted transition-colors hover:text-ivory"
+              >
+                None
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-[260px] overflow-y-auto stage-scroll">
+            {eligible.map((p) => (
+              <label
+                key={p.id}
+                className="flex cursor-pointer items-center gap-3 border-b border-[rgba(212,175,55,.06)] px-3.5 py-2 last:border-0 hover:bg-[rgba(212,175,55,.03)]"
+              >
+                <input
+                  type="checkbox"
+                  checked={picked.has(p.id)}
+                  onChange={() => toggle(p.id)}
+                  className="h-3.5 w-3.5 flex-none accent-[#D4AF37]"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[12.5px] text-ivory">{p.name}</span>
+                  <span className="block truncate text-[11px] text-muted">{p.email}</span>
+                </span>
+                <span className="flex-none text-[11px] text-gold">{p.office}</span>
+              </label>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* The confirm states the blast radius: how many, to which offices, and
           that it cannot be taken back. */}
-      {confirming && chosen && (
+      {confirming && (
         <div className="mt-4 rounded-[11px] border border-[rgba(212,175,55,.35)] bg-[rgba(212,175,55,.05)] p-4">
           <div className="text-[13px] font-semibold text-champagne">
-            Send {toSend.length} agreement{toSend.length === 1 ? '' : 's'} for {chosen.date}?
+            Send {toSend.length} agreement{toSend.length === 1 ? '' : 's'}
+            {chosen ? ` for ${chosen.date}` : ''}?
           </div>
           <p className="mt-1.5 text-[12px] leading-relaxed text-muted">
             Each person receives their own office's agreement by email and text. Documents cannot be
