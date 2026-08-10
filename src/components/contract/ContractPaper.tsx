@@ -20,6 +20,11 @@ interface Props {
   fillable?: boolean
   signerValues?: Record<string, string>
   onSignerChange?: (key: string, value: string) => void
+  /**
+   * The date to show in the execution block before anything is signed — the
+   * day the document is being opened. A signature's own date always wins.
+   */
+  signDate?: string
 }
 
 /** intro_day -> "Intro day" */
@@ -39,6 +44,7 @@ export default function ContractPaper({
   fillable,
   signerValues,
   onSignerChange,
+  signDate,
 }: Props) {
   const merged = mergeFields(details, branding, preparerName)
   const optional = template.optionalFields ?? []
@@ -116,12 +122,14 @@ export default function ContractPaper({
           name={details.entityName || branding.businessName}
           title="Owner"
           signature={details.signature}
+          date={signDate}
         />
         <SignatureBlock
           party="“CONTRACTOR”"
           name={preparerName ?? ''}
           title="Independent Contractor"
           signature={counterSignature}
+          date={signDate}
         />
       </div>
     </div>
@@ -315,11 +323,14 @@ function SignatureBlock({
   name,
   title,
   signature,
+  date,
 }: {
   party: string
   name: string
   title: string
   signature?: Signature
+  /** Shown until there is a signature of its own to date the block. */
+  date?: string
 }) {
   const line =
     'exec-line flex items-baseline gap-2 border-b border-[rgba(212,175,55,.2)] py-1.5 text-[12px]'
@@ -355,9 +366,12 @@ function SignatureBlock({
         <span className={label}>Title:</span>
         <span className="text-ivory">{title}</span>
       </div>
+      {/* The agreement is executed as of the day it is opened and signed, so
+          the date fills in on sight rather than sitting as a dash the signer
+          has no way to complete. A real signature's own date always wins. */}
       <div className={line}>
         <span className={label}>Date:</span>
-        <span className="text-ivory">{signature?.signedAt || '—'}</span>
+        <span className="text-ivory">{signature?.signedAt || date || '—'}</span>
       </div>
     </div>
   )

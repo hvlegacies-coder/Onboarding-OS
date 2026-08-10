@@ -265,6 +265,9 @@ export default function SignContract() {
             branding={branding}
             preparerName={signed ? send.signature?.name : send.prospect.name}
             counterSignature={send.signature}
+            // The execution block dates itself the day this is opened, until a
+            // signature carries a date of its own.
+            signDate={send.signedAt || today}
             fillable={!signed}
             signerValues={signerValues}
             onSignerChange={(k, v) => {
