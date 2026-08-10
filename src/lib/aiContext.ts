@@ -1,7 +1,8 @@
 import { offices, messages as messageCatalog, requiredModules } from '../data/mock'
 import { allPreparers } from './prospectStore'
 import { allSessions } from './sessionStore'
-import { docStatus, statusOf, storeSnapshot, assignedTemplateId, missingOfficeDetails } from './contractStore'
+import { docStatus, statusOf, assignedTemplateId, missingOfficeDetails } from './contractStore'
+import { allDocuments } from './documents'
 import { REMINDER_HOURS } from './reminders'
 import type { Preparer } from '../types'
 
@@ -123,7 +124,9 @@ export function buildContext(scope: Scope): string {
   const everyone = allPreparers()
   const people = everyone.filter((p) => permits(p.officeId))
   const visibleOffices = offices.filter((o) => permits(o.id))
-  const sends = storeSnapshot().sends.filter((s) => permits(s.officeId))
+  // From the database-backed cache, not this browser — the assistant was
+  // reasoning about a local store that no longer holds any documents.
+  const sends = allDocuments().filter((s) => permits(s.officeId))
 
   const byStage = people.reduce<Record<string, number>>((acc, p) => {
     acc[p.stage] = (acc[p.stage] ?? 0) + 1

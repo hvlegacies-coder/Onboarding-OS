@@ -8,6 +8,7 @@ import StagePill from '../components/ui/StagePill'
 import { offices } from '../data/mock'
 import { preparerById, useProspects } from '../lib/prospectStore'
 import { DOC_LABEL, docStatus, statusOf } from '../lib/contractStore'
+import { useDocuments } from '../lib/documents'
 import type { Preparer, Stage } from '../types'
 
 /** What happens next for someone at this stage, in plain language. */
@@ -26,6 +27,9 @@ const NEXT: Record<Stage, { text: string; danger?: boolean }> = {
 
 export default function Contracts() {
   const { preparers } = useProspects()
+  // Document status comes from the database; without this the page renders
+  // before the cache lands and every row reads "not sent".
+  useDocuments()
   const [openId, setOpenId] = useState<string | null>(null)
   const selected = preparerById(openId ?? undefined)
 

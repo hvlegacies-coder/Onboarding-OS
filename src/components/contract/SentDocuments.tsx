@@ -135,13 +135,13 @@ function SendForm({
     // Create the document first — the link has to exist before we announce it.
     // It is written to the database, so the token resolves on the recipient's
     // device rather than only on this one.
+    // The office's saved details are read inside `raiseDocument`, from
+    // `owner_contracts`, so every caller produces the same document.
     const raised = await raiseDocument({
       officeId,
       officeName: businessName,
       ownerName: office.ownerName,
       logo: branding.logo || office.logoUrl || undefined,
-      template,
-      details,
       prospect: { name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim() },
     })
     if (!raised.ok) {

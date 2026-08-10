@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { supabase, supabaseReady } from '../../lib/supabase'
 import { clearProspects, hydrateProspects } from '../../lib/prospectStore'
 import { hydrateSessions } from '../../lib/sessionStore'
+import { clearDocuments, hydrateDocuments } from '../../lib/documents'
 
 export type Role = 'admin' | 'owner'
 
@@ -78,6 +79,7 @@ async function loadSession(userId: string, email: string): Promise<Session | nul
 function hydrate() {
   void hydrateProspects()
   void hydrateSessions()
+  void hydrateDocuments()
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -136,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase?.auth.signOut()
     setSession(null)
     clearProspects()
+    clearDocuments()
   }
 
   return (

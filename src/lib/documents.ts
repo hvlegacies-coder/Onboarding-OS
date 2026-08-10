@@ -1,6 +1,25 @@
+import { useEffect, useSyncExternalStore } from 'react'
 import { supabase } from './supabase'
 import { ICA_TEMPLATE } from '../data/icaTemplate'
-import { blankDetails } from './contractStore'
+/**
+ * A blank set of answers.
+ *
+ * Defined here rather than imported from `contractStore`, which imports this
+ * module in turn. A cycle between two modules that both do work at import time
+ * resolves to `undefined` in whichever loads first — not a thing to discover
+ * in production.
+ */
+const blankDetails = (): ContractDetails => ({
+  heroTitle: '',
+  heroSubtitle: '',
+  entityName: '',
+  businessAddress: '',
+  cityStateZip: '',
+  governingState: '',
+  agreementDate: '',
+  termLength: `${TERM_YEARS} years`,
+  values: {},
+})
 import type { ContractDetails, ContractSend, ContractTemplate, SendStatus, Signature } from '../types'
 
 /**
@@ -64,6 +83,9 @@ interface Snapshot {
 const SNAPSHOT_KEY = '_snapshot'
 const SIGNER_KEY = '_signer'
 
+/** The only contract this platform sends, and the platform's own name for it. */
+export const CONTRACT_TYPE = 'independent_contractor'
+
 /**
  * Blanks the signer filled in.
  *
@@ -74,13 +96,23 @@ const SIGNER_KEY = '_signer'
 function signerValuesOf(form: Record<string, unknown> | null): Record<string, string> {
   if (!form) return {}
   const nested = form[SIGNER_KEY]
-  const source =
-    nested && typeof nested === 'object'
-      ? (nested as Record<string, unknown>)
-      : Object.fromEntries(Object.entries(form).filter(([k]) => k !== SNAPSHOT_KEY))
-  return Object.fromEntries(
-    Object.entries(source).map(([k, v]) => [k, typeof v === 'string' ? v : String(v ?? '')]),
-  )
+  if (nested && typeof nested === 'object') {
+    return Object.fromEntries(
+      Object.entries(nested as Record<string, unknown>).map(([k, v]) => [k, String(v ?? '')]),
+    )
+  }
+  // A document in the platform's own shape keeps the contractor's answers under
+  // its names, not this app's. Translate them so a signed agreement renders
+  // with what the contractor actually typed.
+  const s = (k: string) => (typeof form[k] === 'string' ? (form[k] as string) : '')
+  const out: Record<string, string> = {}
+  const name = s('sig_contractor_print') || s('contractor_name')
+  const address = s('contractor_place') || s('notice_contractor_address')
+  const city = s('notice_contractor_city')
+  if (name) out.preparer_name = name
+  if (address) out.preparer_address = address
+  if (city) out.preparer_city = city
+  return out
 }
 
 const snapshotOf = (form: Record<string, unknown> | null): Snapshot => {
@@ -206,7 +238,74 @@ export function toSend(r: DocumentRow): ContractSend {
     signedAt: r.signed_at ? stamp(r.signed_at) : undefined,
     signature: readSignature(r.signature),
     signerValues: signerValuesOf(form),
+    raw: Object.fromEntries(
+      Object.entries(form).filter(([k]) => k !== SNAPSHOT_KEY && k !== SIGNER_KEY),
+    ) as Record<string, string>,
   }
+}
+
+/* ── The console's view of every document ────────────────── */
+
+/**
+ * Documents, cached for the admin screens.
+ *
+ * The drawer, the Contracts page and the pipeline all ask "has this person been
+ * sent a contract, and did they open it". That used to be answered from
+ * localStorage, so a real document raised anywhere else read as "not sent".
+ * One shared, database-backed cache answers it for all of them.
+ */
+let cache: ContractSend[] = []
+let cacheLoaded = false
+const cacheListeners = new Set<() => void>()
+let cacheInFlight: Promise<void> | null = null
+
+export function hydrateDocuments(): Promise<void> {
+  cacheInFlight ??= (async () => {
+    try {
+      cache = await fetchDocuments()
+      cacheLoaded = true
+      cacheListeners.forEach((l) => l())
+    } finally {
+      cacheInFlight = null
+    }
+  })()
+  return cacheInFlight
+}
+
+export function useDocuments() {
+  useSyncExternalStore(
+    (l) => {
+      cacheListeners.add(l)
+      return () => cacheListeners.delete(l)
+    },
+    () => cache,
+    () => cache,
+  )
+  useEffect(() => {
+    void hydrateDocuments()
+  }, [])
+  return { documents: cache, loading: !cacheLoaded }
+}
+
+const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+/** The most recent document sent to one person, from the cache. */
+export const documentFor = (email: string) =>
+  email ? cache.find((s) => sameEmail(s.prospect.email, email)) : undefined
+
+/** Every document raised for one office. */
+export const documentsForOffice = (officeId: string) =>
+  cache.filter((s) => s.officeId === officeId)
+
+/** Everything the signed-in user may see, for non-React callers. */
+export const allDocuments = () => cache
+
+/** Drop the cache on sign-out so nothing survives into the next session. */
+export function clearDocuments() {
+  cache = []
+  cacheLoaded = false
+  cacheInFlight = null
+  cacheListeners.forEach((l) => l())
 }
 
 /* ── Reading ─────────────────────────────────────────────── */
@@ -372,8 +471,6 @@ export interface RaiseArgs {
   officeName: string
   ownerName: string
   logo?: string
-  template: ContractTemplate
-  details: ContractDetails
   prospect: { name: string; email: string; phone: string }
 }
 
@@ -389,22 +486,40 @@ export async function raiseDocument(
 ): Promise<{ ok: true; send: ContractSend } | { ok: false; error: string }> {
   if (!supabase) return { ok: false, error: 'Supabase is not configured for this site.' }
 
-  const snapshot: Snapshot = {
-    office: { name: args.officeName, ownerName: args.ownerName, logo: args.logo },
-    details: args.details,
-    template: args.template,
+  // The office's own setup, read here rather than passed in, so every caller
+  // raises the same document for the same office.
+  const { data: oc } = await supabase
+    .from('owner_contracts')
+    .select('details,required_fields,custom_clauses,block_overrides')
+    .eq('owner_id', args.officeId)
+    .eq('contract_type', CONTRACT_TYPE)
+    .maybeSingle()
+
+  const fields = deriveDocumentFields({
+    stored: (oc?.details as Record<string, unknown>) ?? {},
+    officeName: args.officeName,
+    ownerName: args.ownerName,
+    logo: args.logo,
     prospect: args.prospect,
-  }
+  })
 
   const { data, error } = await supabase
     .from('documents')
     .insert({
       owner_id: args.officeId,
-      title: args.template.name,
+      title: ICA_TEMPLATE.name,
+      contract_type: CONTRACT_TYPE,
       recipient_name: args.prospect.name,
       recipient_email: args.prospect.email,
       recipient_phone: args.prospect.phone,
-      form_data: { [SNAPSHOT_KEY]: snapshot, [SIGNER_KEY]: {} },
+      // Written flat, in the platform's own vocabulary, so the document is
+      // readable by both this console and the contract app.
+      form_data: fields,
+      // Any amendments the office has made travel with the document, frozen at
+      // send time — three offices have block overrides.
+      required_fields: oc?.required_fields ?? [],
+      custom_clauses: oc?.custom_clauses ?? [],
+      block_overrides: oc?.block_overrides ?? {},
       status: 'pending',
       sent_at: new Date().toISOString(),
     })
@@ -428,6 +543,37 @@ export async function raiseDocument(
   }
 
   return { ok: true, send: toSend(row) }
+}
+
+/**
+ * Record that a reminder went out.
+ *
+ * Written to the document itself, so the schedule survives a closed browser and
+ * two consoles cannot chase the same person twice.
+ */
+export async function recordReminderSent(
+  token: string,
+  type: string,
+  final: boolean,
+): Promise<void> {
+  if (!supabase) return
+  const { data } = await supabase
+    .from('documents')
+    .select('reminders')
+    .eq('token', token)
+    .maybeSingle()
+
+  const already = (data?.reminders as string[]) ?? []
+  if (already.includes(type)) return
+
+  const patch: Record<string, unknown> = {
+    reminders: [...already, type],
+    updated_at: new Date().toISOString(),
+  }
+  if (final) patch.reminders_stopped = true
+
+  const { error } = await supabase.from('documents').update(patch).eq('token', token)
+  if (error) console.error('recordReminderSent', error.message)
 }
 
 /** Record a decline, with the reason they gave. */
@@ -460,17 +606,34 @@ export async function signDocument(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!supabase) return { ok: false, error: 'Supabase is not configured for this site.' }
 
-  const snapshot: Snapshot = {
-    office: { name: send.officeName, ownerName: send.ownerName, logo: send.logo },
-    details: send.details,
-    template: send.template,
-    prospect: send.prospect,
+  const now = new Date()
+  const name = signature.name.trim() || send.prospect.name
+  const address = signerValues.preparer_address ?? ''
+  const city = signerValues.preparer_city ?? ''
+
+  // Merged into what the document already holds, never over it: the RPC
+  // replaces `form_data` outright, so anything omitted here is destroyed.
+  const form: Record<string, string> = {
+    ...(send.raw ?? {}),
+    contractor_name: name,
+    contractor_place: address,
+    notice_contractor_entity: name,
+    notice_contractor_address: address,
+    notice_contractor_city: city,
+    notice_contractor_attn: name,
+    sig_contractor_org: name,
+    sig_contractor_by: signature.drawing ?? name,
+    sig_contractor_print: name,
+    sig_contractor_title: 'Independent Contractor',
+    sig_contractor_date: `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`,
   }
 
   const { error } = await supabase.rpc('sign_document', {
     p_token: send.token,
-    p_signature: JSON.stringify(signature),
-    p_form: { [SNAPSHOT_KEY]: snapshot, [SIGNER_KEY]: signerValues },
+    // A bare data URL or a typed name, as the platform stores it — not this
+    // app's Signature object, which its renderer would not understand.
+    p_signature: signature.drawing ?? signature.name,
+    p_form: form,
   })
   if (error) {
     console.error('signDocument', error.message)

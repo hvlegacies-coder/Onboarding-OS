@@ -181,6 +181,13 @@ export interface ContractSend {
   /** Blanks the signer filled in on their copy. */
   signerValues?: Record<string, string>
   declineReason?: string
+  /**
+   * The document's stored fields, exactly as the contract platform keeps them.
+   * Carried so signing can merge into them rather than replace them — the sign
+   * RPC overwrites `form_data` wholesale, and an agreement blanked by the act
+   * of signing it is the worst failure this system could have.
+   */
+  raw?: Record<string, string>
 }
 
 export interface Activity {

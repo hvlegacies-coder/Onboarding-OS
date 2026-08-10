@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { ICA_TEMPLATE } from '../data/icaTemplate'
+import { documentFor, documentsForOffice } from './documents'
 import { offices, preparers as seedPreparers } from '../data/mock'
 import { contractStatus } from './contract'
 import type {
@@ -373,14 +374,23 @@ export function createSendForOffice(
   })
 }
 
-export const getSend = (token: string | undefined) => store.sends.find((s) => s.token === token)
+/**
+ * A document by token is fetched from the database in `documents.ts`, not
+ * looked up here — the signing page is anonymous and this cache only ever
+ * holds what the signed-in console can see.
+ */
 
-export const sendsForOffice = (officeId: string) => store.sends.filter((s) => s.officeId === officeId)
+export const sendsForOffice = (officeId: string) => documentsForOffice(officeId)
 
-/** The most recent document sent to one person. Email is the only identifier
- *  the contract platform and the central account share. */
-export const latestSendTo = (email: string) =>
-  store.sends.find((s) => s.prospect.email.toLowerCase() === email.trim().toLowerCase())
+/**
+ * The most recent document sent to one person. Email is the only identifier
+ * the contract platform and the central account share.
+ *
+ * Answered from the database-backed cache in `documents.ts`. It used to read
+ * this browser's own store, so a contract raised anywhere else — by another
+ * admin, by the contract app — showed here as never sent.
+ */
+export const latestSendTo = (email: string) => documentFor(email)
 
 /** Whether a document has actually gone out to this person. */
 export const hasSendTo = (email: string) => Boolean(latestSendTo(email))
@@ -446,62 +456,15 @@ export function docStatus(email: string): DocStatus {
 const isoToday = () =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
 
-export function markViewed(token: string) {
-  const s = getSend(token)
-  if (!s || s.status !== 'sent') return
-  commit({
-    ...store,
-    sends: store.sends.map((x) =>
-      x.token === token
-        ? { ...x, status: 'viewed', viewedAt: stamp(), accessedOn: x.accessedOn ?? isoToday() }
-        : x,
-    ),
-  })
-}
-
-export function signSend(
-  token: string,
-  signature: Signature,
-  signerValues: Record<string, string> = {},
-) {
-  commit({
-    ...store,
-    sends: store.sends.map((x) =>
-      x.token === token
-        ? { ...x, status: 'signed', signature, signerValues, signedAt: signature.signedAt }
-        : x,
-    ),
-  })
-}
-
-/**
- * Records that a reminder went out, and closes the sequence when it was the
- * last one. Written before the network call returns is deliberate — see
- * `runDueReminders`.
+/*
+ * Viewing, signing, declining and reminder-recording all used to be written
+ * here, into this browser. They are database operations now — `get_document`
+ * stamps the view, `sign_document` and `decline_document` write the outcome,
+ * and `recordReminderSent` closes out the schedule. See `documents.ts`.
+ *
+ * The local versions are gone rather than left unused: a function that quietly
+ * writes to a store nothing reads is worse than no function at all.
  */
-export function recordReminder(token: string, type: string, final = false) {
-  commit({
-    ...store,
-    sends: store.sends.map((x) =>
-      x.token === token
-        ? {
-            ...x,
-            reminders: [...(x.reminders ?? []), type],
-            remindersStopped: final || x.remindersStopped,
-          }
-        : x,
-    ),
-  })
-}
-
-export function declineSend(token: string, reason: string) {
-  commit({
-    ...store,
-    sends: store.sends.map((x) =>
-      x.token === token ? { ...x, status: 'declined', declineReason: reason } : x,
-    ),
-  })
-}
 
 /**
  * The details as the signer sees them. An office that left the agreement date

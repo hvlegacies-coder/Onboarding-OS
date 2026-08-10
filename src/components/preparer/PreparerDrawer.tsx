@@ -16,6 +16,7 @@ import {
 } from '../../lib/contractStore'
 import { eventsFor, moveStage, removePreparer, useProspects } from '../../lib/prospectStore'
 import { notify } from '../../lib/toast'
+import { useDocuments } from '../../lib/documents'
 import type { JourneyEntry } from '../../lib/journey'
 import type { Preparer } from '../../types'
 
@@ -39,6 +40,7 @@ export default function PreparerDrawer({
   // Re-render when a manual action moves them, or a contract comes back signed.
   useProspects()
   useContracts()
+  useDocuments()
 
   const [confirming, setConfirming] = useState(false)
   const [removing, setRemoving] = useState(false)

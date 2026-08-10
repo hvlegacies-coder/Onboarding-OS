@@ -5,7 +5,13 @@ import Toasts from '../ui/Toasts'
 import { runDueReminders } from '../../lib/reminders'
 
 /** How often the console re-checks for reminders that have come due. */
-const SWEEP_MS = 60_000
+/**
+ * The reminder sweep now reads the database rather than this browser, so each
+ * tick is a real query. Reminders fire on 12, 24 and 48-hour marks — checking
+ * every five minutes is ample, and a minute would have every open console
+ * re-reading every document all day.
+ */
+const SWEEP_MS = 5 * 60_000
 
 export default function AppShell() {
   /*

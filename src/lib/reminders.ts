@@ -1,4 +1,4 @@
-import { recordReminder, storeSnapshot } from './contractStore'
+import { fetchDocuments, recordReminderSent } from './documents'
 import { sendReminder } from './ghl'
 import { findByEmail, logEvent, moveStage } from './prospectStore'
 import type { ContractSend } from '../types'
@@ -71,7 +71,10 @@ export function remainingReminders(send: ContractSend): ReminderType[] {
  * follow-up and automation stops touching them (R4).
  */
 export async function runDueReminders(now = Date.now()): Promise<number> {
-  const { sends } = storeSnapshot()
+  // Read from the database, not this browser. Reminders used to sweep a local
+  // store, which meant they never saw a real document — and could chase one
+  // that only ever existed in one person's browser.
+  const sends = await fetchDocuments()
   let fired = 0
 
   for (const send of sends) {
@@ -79,7 +82,7 @@ export async function runDueReminders(now = Date.now()): Promise<number> {
     if (!type) continue
 
     const final = isFinalReminder(type)
-    recordReminder(send.token, type, final)
+    await recordReminderSent(send.token, type, final)
     fired++
 
     const res = await sendReminder({
