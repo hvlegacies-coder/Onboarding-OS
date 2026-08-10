@@ -298,17 +298,28 @@ export function deriveDocumentFields(args: {
   // be sitting in the stored contract details, which in at least one office is
   // an email address.
   const company = args.officeName || str('company_name')
-  const place = str('company_place')
-  const city = str('company_city')
 
+  /*
+   * Deliberately minimal.
+   *
+   * Only four things go onto an agreement right now: the entity name, the
+   * dates, the term, and the applicant's own details. The offices' stored
+   * addresses, cities, governing states and countersignatures are held back
+   * until they have been verified — twelve different people typed them, in
+   * twelve different formats, and an unverified address on an executed
+   * contract is worse than a blank one the owner fills in afterwards.
+   *
+   * Restoring any of them is a one-line change here: read `str('company_place')`
+   * and so on, exactly as before.
+   */
   return {
     intro_day: String(d.getDate()),
     intro_month: month,
     intro_year: yy,
     company_name: company,
-    company_place: place,
-    company_city: city,
-    governing_state: str('governing_state'),
+    company_place: '',
+    company_city: '',
+    governing_state: '',
     agreement_date: iso,
     contractor_name: args.prospect.name,
     contractor_place: '',
@@ -320,17 +331,19 @@ export function deriveDocumentFields(args: {
     // Notices — the company block restates the company fields; the attn line
     // is the owner personally, which is why an office with no `owner_name`
     // leaves it blank.
+    // Notices: the entity is named, the rest of the block stays blank.
     notice_company_entity: company,
-    notice_company_address: place,
-    notice_company_city: city,
-    notice_company_attn: args.ownerName,
+    notice_company_address: '',
+    notice_company_city: '',
+    notice_company_attn: '',
     notice_contractor_entity: args.prospect.name,
     notice_contractor_address: '',
     notice_contractor_city: '',
     notice_contractor_attn: args.prospect.name,
-    // Execution
+    // Execution. The countersignature is held back with the rest — the owner
+    // signs, or completes it, after the applicant has.
     sig_company_org: company,
-    sig_company_by: str('owner_signature'),
+    sig_company_by: '',
     sig_company_print: company,
     sig_company_title: 'Owner',
     sig_company_date: `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`,
@@ -339,7 +352,7 @@ export function deriveDocumentFields(args: {
     sig_contractor_print: '',
     sig_contractor_title: 'Independent Contractor',
     sig_contractor_date: '',
-    owner_signature: str('owner_signature'),
+    owner_signature: '',
     company_logo: args.logo ?? '',
   }
 }
