@@ -13,6 +13,9 @@ import { runDueReminders } from '../../lib/reminders'
  */
 const SWEEP_MS = 5 * 60_000
 
+/** Off until the sweep can tell our documents from the contract platform's. */
+const REMINDERS_ENABLED = false
+
 export default function AppShell() {
   /*
    * Contract reminders are driven from here while the console is open: on
@@ -24,7 +27,21 @@ export default function AppShell() {
    * moment of delivery drifts. Moving the wait steps into the GoHighLevel
    * workflow, or a server cron, is what makes the timing dependable.
    */
+  /*
+   * DISABLED — do not re-enable without scoping it first.
+   *
+   * When the sweep was repointed from localStorage to the database it began
+   * seeing every document in the table, including the ones the contract
+   * platform raised. It immediately chased nineteen of them: real reminders,
+   * to real people, about agreements this platform did not send and is not
+   * responsible for. One prospect was escalated to owner-followup off the back
+   * of a document from three days before we ever raised one.
+   *
+   * The schedule logic in lib/reminders.ts is fine. What is missing is a
+   * definition of which documents are ours to chase — see the note there.
+   */
   useEffect(() => {
+    if (!REMINDERS_ENABLED) return
     void runDueReminders()
     const id = setInterval(() => void runDueReminders(), SWEEP_MS)
     return () => clearInterval(id)
