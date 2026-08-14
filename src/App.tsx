@@ -36,7 +36,10 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
-          {/* Public, unauthenticated — the prospect's only view of the platform */}
+          {/* Public, unauthenticated — the prospect's only view of the platform.
+              /j/ is the short link owners actually share; /join/ is kept working
+              for links already handed out before the shortening. */}
+          <Route path="/j/:officeSlug" element={<Join />} />
           <Route path="/join/:officeSlug" element={<Join />} />
           {/* Public — the token in the URL is the only credential */}
           <Route path="/sign/:token" element={<SignContract />} />

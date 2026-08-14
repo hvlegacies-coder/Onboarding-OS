@@ -34,7 +34,8 @@ signed | owner-followup → orientation scheduled → onboarded. See `Stage` in 
 ## Suggested next tasks
 - **Preparer detail drawer**: click a row in Preparers/Contracts to open a side panel with the
   full journey timeline, messages sent, and manual actions.
-- **Prospect-facing invitation form**: the standardized public form at `/join/:officeSlug` that
+- **Prospect-facing invitation form**: the standardized public form at `/j/:officeSlug` (short
+  link; `/join/:officeSlug` still resolves for links already sent) that
   resolves the office from the slug and shows the session catalog. This is the one place a
   prospect ever sees.
 - **Real data layer**: replace `mock.ts` with an API client. Integration targets:

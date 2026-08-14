@@ -56,4 +56,4 @@ export function useOffice(officeId: string | undefined) {
 
 /** The owner's shareable invite URL, absolute against wherever this is served. */
 export const inviteUrlFor = (slug: string) =>
-  `${typeof window === 'undefined' ? '' : window.location.origin}/join/${slug}`
+  `${typeof window === 'undefined' ? '' : window.location.origin}/j/${slug}`

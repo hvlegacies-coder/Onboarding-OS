@@ -70,7 +70,7 @@ export const officeBySlug = (slug: string | undefined) =>
 
 /** The owner's shareable invite URL, absolute against wherever the app is served. */
 export const inviteUrl = (office: Office) =>
-  `${typeof window === 'undefined' ? '' : window.location.origin}/join/${office.slug}`
+  `${typeof window === 'undefined' ? '' : window.location.origin}/j/${office.slug}`
 
 /**
  * Real prospects only. Everyone here arrives through an office invite link and

@@ -57,7 +57,7 @@ branding and business name.
 
 ## The rules that never change
 1. There is ONE standardized invitation form. It has no logos and no office
-   selector. The office is resolved from the unique invite link (/join/:slug),
+   selector. The office is resolved from the unique invite link (/j/:slug),
    never from anything the prospect types.
 2. All contacts and pipeline stages live in one central account.
 3. The contract a prospect receives must match the inviting owner's office —
@@ -137,7 +137,7 @@ export function buildContext(scope: Scope): string {
     const tpl = assignedTemplateId(o.id)
     const missing = tpl ? missingOfficeDetails(o.id, tpl) : ['no template assigned']
     const count = people.filter((p) => p.officeId === o.id).length
-    return `- ${o.name} (id: ${o.id}, link: /join/${o.slug})${
+    return `- ${o.name} (id: ${o.id}, link: /j/${o.slug})${
       o.owner ? ` · owner: ${o.owner}` : ' · owner name not collected'
     } · ${count} preparers · contract ${
       missing.length ? `NOT ready — missing: ${missing.join(', ')}` : 'ready to send'
