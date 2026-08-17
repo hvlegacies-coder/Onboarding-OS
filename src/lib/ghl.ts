@@ -148,8 +148,10 @@ export const sendReminder = (payload: ReminderPayload) =>
  */
 export interface SignedPayload {
   fullName: string
-  phone: string
   email: string
+  phone: string
+  officeName: string
+  officeId: string
   signedContractLink: string
 }
 

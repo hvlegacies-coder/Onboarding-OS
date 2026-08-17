@@ -167,8 +167,10 @@ export default function SignContract() {
     // signer's confirmation. `?signed` opens the document in print view.
     void sendSigned({
       fullName: send.prospect.name,
-      phone: send.prospect.phone,
       email: send.prospect.email,
+      phone: send.prospect.phone,
+      officeName: send.officeName,
+      officeId: send.officeId,
       signedContractLink: `${signUrl(token)}?copy=signed`,
     })
 
