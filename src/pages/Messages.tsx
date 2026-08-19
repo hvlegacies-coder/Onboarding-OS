@@ -4,9 +4,11 @@ import PageHead from '../components/ui/PageHead'
 import Chip from '../components/ui/Chip'
 import Avatar from '../components/ui/Avatar'
 import { messages } from '../data/mock'
-import { recordOnboardingSent, useDocuments } from '../lib/documents'
+import { documentFor, recordOnboardingSent, useDocuments } from '../lib/documents'
+import { statusOf } from '../lib/contractStore'
+import { useProspects } from '../lib/prospectStore'
 import { ghlOnboardingConfigured, sendOnboarding } from '../lib/ghl'
-import type { ContractSend as Doc } from '../types'
+import type { Preparer } from '../types'
 
 export default function Messages() {
   return (
@@ -46,31 +48,65 @@ type RowState = 'idle' | 'sending' | 'sent' | 'error'
 
 type Tab = 'toSend' | 'sent'
 
+/**
+ * One signed preparer, joined against their document if one exists. A
+ * pipeline stage can reach 'signed' without a matching document row (e.g. an
+ * admin marking it manually), so `token` is optional and that case is called
+ * out in the UI rather than silently dropped or crashing the send.
+ */
+interface SignedRow {
+  key: string
+  token?: string
+  name: string
+  email: string
+  phone: string
+  officeName: string
+  officeId: string
+  signedOn?: string
+  onboardingSentAt?: string
+}
+
 function SignedPreparers() {
-  const { documents, loading } = useDocuments()
+  // `preparers` is what the Contracts page counts "Signed" from (pipeline
+  // stage, not the raw document status) — using the same source here keeps
+  // the two counts from disagreeing.
+  const { preparers } = useProspects()
+  const { loading } = useDocuments()
   const [tab, setTab] = useState<Tab>('toSend')
   const [state, setState] = useState<Record<string, RowState>>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkSending, setBulkSending] = useState(false)
 
-  const signed = useMemo(
-    () =>
-      documents
-        .filter((d) => d.status === 'signed')
-        .sort((a, b) => (b.signedAt ?? '').localeCompare(a.signedAt ?? '')),
-    [documents],
-  )
+  const signed = useMemo<SignedRow[]>(() => {
+    const withSignedStatus = preparers.filter((p: Preparer) => statusOf(p) === 'signed')
+    return withSignedStatus
+      .map((p) => {
+        const doc = documentFor(p.email)
+        return {
+          key: doc?.token ?? p.id,
+          token: doc?.token,
+          name: p.name,
+          email: p.email,
+          phone: p.phone,
+          officeName: p.office,
+          officeId: p.officeId,
+          signedOn: p.signedOn ?? doc?.signedAt,
+          onboardingSentAt: doc?.onboardingSentAt,
+        }
+      })
+      .sort((a, b) => (b.signedOn ?? '').localeCompare(a.signedOn ?? ''))
+  }, [preparers])
 
   // A send just recorded is enough to move a row — no need to wait on the
   // onboardingSentAt round trip too.
   const toSend = useMemo(
-    () => signed.filter((d) => !d.onboardingSentAt && state[d.token] !== 'sent'),
+    () => signed.filter((d) => !d.onboardingSentAt && state[d.key] !== 'sent'),
     [signed, state],
   )
   const alreadySent = useMemo(
     () =>
       signed
-        .filter((d) => d.onboardingSentAt || state[d.token] === 'sent')
+        .filter((d) => d.onboardingSentAt || state[d.key] === 'sent')
         .sort((a, b) => (b.onboardingSentAt ?? '').localeCompare(a.onboardingSentAt ?? '')),
     [signed, state],
   )
@@ -78,9 +114,9 @@ function SignedPreparers() {
 
   // Drop selections for anyone who is no longer in the "to send" list.
   useEffect(() => {
-    const tokens = new Set(toSend.map((d) => d.token))
+    const keys = new Set(toSend.map((d) => d.key))
     setSelected((s) => {
-      const next = new Set([...s].filter((t) => tokens.has(t)))
+      const next = new Set([...s].filter((k) => keys.has(k)))
       return next.size === s.size ? s : next
     })
   }, [toSend])
@@ -89,33 +125,35 @@ function SignedPreparers() {
   const someSelected = selected.size > 0 && !allSelected
 
   const toggleAll = () => {
-    setSelected(allSelected ? new Set() : new Set(toSend.map((d) => d.token)))
+    setSelected(allSelected ? new Set() : new Set(toSend.map((d) => d.key)))
   }
 
-  const toggleOne = (token: string) => {
+  const toggleOne = (key: string) => {
     setSelected((s) => {
       const next = new Set(s)
-      if (next.has(token)) next.delete(token)
-      else next.add(token)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }
 
-  const sendOne = async (d: Doc) => {
-    setState((s) => ({ ...s, [d.token]: 'sending' }))
+  const sendOne = async (d: SignedRow) => {
+    setState((s) => ({ ...s, [d.key]: 'sending' }))
     const res = await sendOnboarding({
-      name: d.prospect.name,
-      email: d.prospect.email,
-      phone: d.prospect.phone,
+      name: d.name,
+      email: d.email,
+      phone: d.phone,
       officeName: d.officeName,
       officeId: d.officeId,
     })
-    if (res.ok) await recordOnboardingSent(d.token)
-    setState((s) => ({ ...s, [d.token]: res.ok ? 'sent' : 'error' }))
+    // Only a document row can carry the "already sent" flag — a stage-only
+    // signed record falls back to this tab's in-memory state.
+    if (res.ok && d.token) await recordOnboardingSent(d.token)
+    setState((s) => ({ ...s, [d.key]: res.ok ? 'sent' : 'error' }))
   }
 
   const sendSelected = async () => {
-    const targets = toSend.filter((d) => selected.has(d.token))
+    const targets = toSend.filter((d) => selected.has(d.key))
     if (targets.length === 0) return
     setBulkSending(true)
     // One at a time — a burst of parallel posts is more likely to trip the
@@ -204,11 +242,11 @@ function SignedPreparers() {
 
           <div className="space-y-2">
             {shown.map((d) => {
-              const rowState = state[d.token] ?? 'idle'
-              const checked = selected.has(d.token)
+              const rowState = state[d.key] ?? 'idle'
+              const checked = selected.has(d.key)
               return (
                 <div
-                  key={d.token}
+                  key={d.key}
                   className={`flex flex-wrap items-center gap-3 rounded-[11px] border px-3.5 py-2.5 transition-colors ${
                     checked ? 'border-[rgba(212,175,55,.32)] bg-[rgba(212,175,55,.05)]' : 'border-[rgba(212,175,55,.1)]'
                   }`}
@@ -217,17 +255,19 @@ function SignedPreparers() {
                     <input
                       type="checkbox"
                       checked={checked}
-                      onChange={() => toggleOne(d.token)}
+                      onChange={() => toggleOne(d.key)}
                       className="h-[15px] w-[15px] flex-none cursor-pointer accent-[#D4AF37]"
                     />
                   )}
-                  <Avatar initials={d.prospect.name.slice(0, 2).toUpperCase()} size={30} />
+                  <Avatar initials={d.name.slice(0, 2).toUpperCase()} size={30} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold text-ivory">
-                      {d.prospect.name}
+                      {d.name}
                     </span>
                     <span className="block truncate text-[11.5px] text-muted">
-                      {d.officeName} · signed {d.signedAt}
+                      {d.officeName}
+                      {d.signedOn ? ` · signed ${d.signedOn}` : ''}
+                      {!d.token && ' · no document on file'}
                     </span>
                   </span>
                   {tab === 'toSend' ? (
