@@ -183,6 +183,8 @@ export interface ContractSend {
   /** Blanks the signer filled in on their copy. */
   signerValues?: Record<string, string>
   declineReason?: string
+  /** Set once staff has sent the manual onboarding-message webhook for this signer. */
+  onboardingSentAt?: string
   /**
    * The document's stored fields, exactly as the contract platform keeps them.
    * Carried so signing can merge into them rather than replace them — the sign

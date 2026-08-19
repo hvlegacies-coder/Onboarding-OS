@@ -58,6 +58,7 @@ const REGISTRATION_WEBHOOK = import.meta.env.VITE_GHL_REGISTRATION_WEBHOOK || IN
 const CONTRACT_WEBHOOK = import.meta.env.VITE_GHL_CONTRACT_WEBHOOK || INVITE_WEBHOOK
 const REMINDER_WEBHOOK = import.meta.env.VITE_GHL_REMINDER_WEBHOOK || CONTRACT_WEBHOOK
 const SIGNED_WEBHOOK = import.meta.env.VITE_GHL_SIGNED_WEBHOOK || CONTRACT_WEBHOOK
+const ONBOARDING_WEBHOOK = import.meta.env.VITE_GHL_ONBOARDING_WEBHOOK
 
 /** False until the webhooks are set — the UI says so rather than pretending. */
 export const ghlConfigured = Boolean(INVITE_WEBHOOK)
@@ -157,6 +158,35 @@ export interface SignedPayload {
 
 export const sendSigned = (payload: SignedPayload) =>
   post(SIGNED_WEBHOOK, { event: 'signed', ...payload })
+
+/**
+ * A staffer's manual "Send onboarding message" click, for someone who has
+ * signed. Separate webhook from `sendSigned` — that one fires automatically
+ * the moment a signature lands; this one is triggered on demand from the
+ * Messages page, e.g. to re-send or to kick off onboarding by hand.
+ *
+ * Field names match the workflow's own mapping, same convention as
+ * `sendContract` below.
+ */
+export interface OnboardingPayload {
+  name: string
+  email: string
+  phone: string
+  officeName: string
+  officeId: string
+}
+
+export const ghlOnboardingConfigured = Boolean(ONBOARDING_WEBHOOK)
+
+export const sendOnboarding = (payload: OnboardingPayload) =>
+  post(ONBOARDING_WEBHOOK, {
+    event: 'onboarding',
+    Name: payload.name,
+    Email: payload.email,
+    Phone: payload.phone,
+    'Office name': payload.officeName,
+    officeId: payload.officeId,
+  })
 
 export const sendInvite = (payload: InvitePayload) =>
   post(INVITE_WEBHOOK, { event: 'invite', ...payload })

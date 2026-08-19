@@ -65,12 +65,13 @@ interface DocumentRow {
   created_at: string
   reminders: string[] | null
   reminders_stopped: boolean
+  onboarding_sent_at: string | null
 }
 
 const DOC_COLUMNS =
   'id,token,title,recipient_name,recipient_email,recipient_phone,form_data,signature,status,' +
   'owner_id,contract_type,required_fields,custom_clauses,block_overrides,first_accessed_at,' +
-  'signed_at,sent_at,created_at,reminders,reminders_stopped'
+  'signed_at,sent_at,created_at,reminders,reminders_stopped,onboarding_sent_at'
 
 /** What we freeze into `form_data` when a document goes out. */
 interface Snapshot {
@@ -236,6 +237,7 @@ export function toSend(r: DocumentRow): ContractSend {
     viewedAt: r.first_accessed_at ? stamp(r.first_accessed_at) : undefined,
     accessedOn: r.first_accessed_at ? r.first_accessed_at.slice(0, 10) : undefined,
     signedAt: r.signed_at ? stamp(r.signed_at) : undefined,
+    onboardingSentAt: r.onboarding_sent_at ?? undefined,
     signature: readSignature(r.signature),
     signerValues: signerValuesOf(form),
     raw: Object.fromEntries(
@@ -595,6 +597,26 @@ export async function recordReminderSent(
 
   const { error } = await supabase.from('documents').update(patch).eq('token', token)
   if (error) console.error('recordReminderSent', error.message)
+}
+
+/**
+ * Record that staff sent the manual onboarding message for this document, so
+ * it moves out of the "to send" list and can't be double-sent from a second
+ * tab or a reload.
+ */
+export async function recordOnboardingSent(token: string): Promise<void> {
+  if (!supabase) return
+  const sentAt = new Date().toISOString()
+  const { error } = await supabase
+    .from('documents')
+    .update({ onboarding_sent_at: sentAt })
+    .eq('token', token)
+  if (error) {
+    console.error('recordOnboardingSent', error.message)
+    return
+  }
+  cache = cache.map((d) => (d.token === token ? { ...d, onboardingSentAt: sentAt } : d))
+  cacheListeners.forEach((l) => l())
 }
 
 /** Record a decline, with the reason they gave. */
