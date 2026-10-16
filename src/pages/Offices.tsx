@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Check,
   ChevronDown,
@@ -13,7 +13,7 @@ import {
 import PageHead from '../components/ui/PageHead'
 import Chip from '../components/ui/Chip'
 import OfficeMark from '../components/ui/OfficeMark'
-import { offices, inviteUrl } from '../data/mock'
+import { offices as mockOffices, inviteUrl } from '../data/mock'
 import {
   assignTemplate,
   assignedTemplateId,
@@ -22,7 +22,31 @@ import {
   useContracts,
 } from '../lib/contractStore'
 import { useProspects } from '../lib/prospectStore'
+import { fetchOffices } from '../lib/supabase'
 import type { BrandingStatus, Office } from '../types'
+
+/** Real tenants from Supabase, falling back to the prototype seed for any
+ *  office not yet migrated there (slugs in `mockOffices` but not the DB). */
+function useOffices(): Office[] {
+  const [live, setLive] = useState<Office[] | null>(null)
+  useEffect(() => {
+    fetchOffices().then((rows) =>
+      setLive(
+        rows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          owner: r.ownerName,
+          initials: r.initials,
+          slug: r.slug,
+          branding: r.logoUrl ? 'complete' : 'logo-pending',
+        })),
+      ),
+    )
+  }, [])
+  if (!live) return mockOffices
+  const liveSlugs = new Set(live.map((o) => o.slug))
+  return [...live, ...mockOffices.filter((o) => !liveSlugs.has(o.slug))]
+}
 
 const brand: Record<BrandingStatus, { label: string; tone: 'good' | 'warn' }> = {
   complete: { label: 'Branding complete', tone: 'good' },
@@ -32,6 +56,7 @@ const brand: Record<BrandingStatus, { label: string; tone: 'good' | 'warn' }> = 
 
 export default function Offices() {
   const { preparers } = useProspects()
+  const offices = useOffices()
   // Only one office is open at a time — the point is a scannable index.
   const [openId, setOpenId] = useState<string | null>(null)
   const [q, setQ] = useState('')
